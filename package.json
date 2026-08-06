@@ -1,0 +1,22 @@
+{
+  "name": "lmic-mc-bot",
+  "version": "1.0.0",
+  "description": "",
+  "main": "mcbot.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Nahida4479/LMIN-MC-BOT.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Nahida4479/LMIN-MC-BOT/issues"
+  },
+  "homepage": "https://github.com/Nahida4479/LMIN-MC-BOT#readme",
+  "dependencies": {
+    "env": "^0.0.2"
+  }
+}
