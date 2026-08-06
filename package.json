@@ -17,6 +17,8 @@
   },
   "homepage": "https://github.com/Nahida4479/LMIN-MC-BOT#readme",
   "dependencies": {
-    "env": "^0.0.2"
+    "env": "^0.0.2",
+    "mineflayer": "^4.37.1",
+    "mineflayer-pvp": "^1.3.2"
   }
 }
