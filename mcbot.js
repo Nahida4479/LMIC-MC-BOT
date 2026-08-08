@@ -7,19 +7,24 @@ function date() {
 }
 
 // Test AI Model
-const geminiModels = ['gemini-2.0-flash', 'gemini-1.5-flash']
-const groqModels = ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant']
+const geminiModels = ['gemini-2.5-flash', 'gemini-2.5-flash-lite']
+const groqModels = ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant', "openai/gpt-oss-120b", "openai/gpt-oss-20b", "qwen/qwen3.6-27b"   ]
 
 async function testGemini(model) {
     try {
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`, {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_FREE_API}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json'},
             body: JSON.stringify({ contents: [{ parts: [{ text: 'text'}] }] })
         })
+        if (response.ok) {
         console.log(response.ok ?`${model}: ACTIVE` : `${model}: ERROR`)
-    } catch {
-        console.log(`${model}: ERROR`)
+        } else {
+            const errorText = await response.text();
+            console.log(`${model}: ERROR (status ${response.status}) - ${errorText}`)
+        }
+    } catch (err) {
+        console.log(`${model}: ERROR ${err.message}`)
     }
 }
 
@@ -29,13 +34,18 @@ async function testGroq(model) {
             method: 'POST',
             headers: {
                 'Content-Type':'application/json',
-                'Authrization': `Bearer ${process.env.GROG_FREE_API}`
+                'Authorization': `Bearer ${process.env.GROG_FREE_API}`
             },
             body: JSON.stringify({ model, messages: [{ role: 'user', content: 'test' }] })
         })
+        if (response.ok) {
         console.log(response.ok ? `${model}: ACTIVE` : `${model}: ERROR`)
-    } catch {
-        console.log(`${model}: ERROR`)
+        } else {
+            const errorText = await response.text();
+            console.log(`${model}: ERROR (status ${response.status}) - ${errorText}`)
+        }
+    } catch (err) {
+        console.log(`${model}: ERROR ${err.message}`)
     }
 }
 
