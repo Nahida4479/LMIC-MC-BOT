@@ -1,9 +1,9 @@
 # LMIN-MC-BOT
 A Mineflayer-based Minecraft bot integrated with an LLMs API for real-time, context-aware chat and navigation.
 
-# Requirements
+## Requirements
 
-## GROQ API
+### GROQ API
 1. Open [console.groq.com](https://console.groq.com) 
 
 2. Click **API Keys** in the left menu.
@@ -20,7 +20,7 @@ A Mineflayer-based Minecraft bot integrated with an LLMs API for real-time, cont
 
 
 
-## GEMINI API
+### GEMINI API
 
 1. Open [aistudio.google.com](aistudio.google.com)
 
