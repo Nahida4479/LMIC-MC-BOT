@@ -6,6 +6,39 @@ function date() {
     return new Date().toLocaleString()
 }
 
+const avaliableAiProviders = []
+
+if (process.env.HACKCLUB_FREE_API) {
+    avaliableAiProviders.push('hackclub')
+}
+
+if (process.env.GEMINI_FREE_API) {
+    avaliableAiProviders.push('gemini')
+}
+
+if (process.env.GROG_FREE_API) {
+    avaliableAiProviders.push('groq')
+}
+
+console.log(`Providers: ${avaliableAiProviders.join(',') || 'NONE'}`)
+
+async function askAI(prompt) {
+    if (avaliableAiProviders.includes('hackclub')) {
+        return await askHackClub(prompt)
+    }
+
+    if (avaliableAiProviders.includes('groq')) {
+        return await askGroq(prompt)
+    }
+
+    if (avaliableAiProviders.includes('gemini')) {
+        return await askGemini(prompt)
+    }
+
+    console.log("You don't insert tocken into .env")
+    return none
+}
+
 // Test AI Model
 const geminiModels = ['gemini-2.5-flash', 'gemini-2.5-flash-lite']
 const groqModels = ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant', "openai/gpt-oss-120b", "openai/gpt-oss-20b", "qwen/qwen3.6-27b"   ]
