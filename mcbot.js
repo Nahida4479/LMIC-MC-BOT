@@ -36,12 +36,35 @@ async function askAI(prompt) {
     }
 
     console.log("You don't insert tocken into .env")
-    return none
+    return null
 }
 
 // Test AI Model
 const geminiModels = ['gemini-2.5-flash', 'gemini-2.5-flash-lite']
 const groqModels = ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant', "openai/gpt-oss-120b", "openai/gpt-oss-20b", "qwen/qwen3.6-27b"   ]
+const HackClubModels = ['meta-llama/llama-3.3-70b-instruct']
+
+async function testHackClub(model) {
+    try {
+        const response = await fetch("https://ai.hackclub.com/proxy/v1/chat/completions", {
+            method: "POST",
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${process.env.HACKCLUB_FREE_API}`
+            },
+            body: JSON.stringify({ model, messages: [{ role: 'user', content: 'test' }] })
+        })
+
+        if (response.ok) {
+            console.log(`${model}: ACTIVE`)
+        } else {
+            const errorText = await response.text()
+            console.log(`${model}: ERROR (${response.status}) - (${errorText})`)
+        }
+    } catch (err) {
+        console.log(`${model}: ERROR ${err.message}`)
+    }
+}
 
 async function testGemini(model) {
     try {
@@ -90,6 +113,10 @@ for (const test of geminiModels) {
 
 for (const test of groqModels) {
     await testGroq(test)
+}
+
+for (const test of HackClubModels) {
+    await testHackClub(test)
 }
 }
 testAllModels();
