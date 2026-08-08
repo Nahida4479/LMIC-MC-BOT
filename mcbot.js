@@ -2,6 +2,7 @@ const mineflayer = require('mineflayer');
 const mineflayer_pvp = require('mineflayer-pvp');
 require('dotenv').config();
 const { mineflayer: mineflayerViewer } = require("prismarine-viewer");
+const canvas = require('canvas');
 
 function date() {
     return new Date().toLocaleString()
@@ -18,8 +19,6 @@ const bot = mineflayer.createBot({
 
 bot.once('spawn', () => {
     console.log(`[${date()}] ${bot.username} active`);
-    mineflayerViewer(bot, { port: parseInt(process.env.BOT_LIVE_STREAM_PORT), firstPerson: true})
-    console.log(`Bot Live Stream: http://localhost:${parseInt(process.env.BOT_LIVE_STREAM_PORT)}`)
 });
 
 bot.on('end', (reason) => {
