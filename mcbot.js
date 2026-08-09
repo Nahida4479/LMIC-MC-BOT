@@ -7,6 +7,19 @@ function date() {
 }
 
 const avaliableAiProviders = []
+const conversationHistory = {}
+const maxHistoryLenght = 20;
+
+function addToHistory(username, role, content) {
+    if (!conversationHistory[username]) {
+        conversationHistory[username] = []
+    }
+    conversationHistory[username].push({ role, content })
+    
+    if (conversationHistory[username].length > maxHistoryLenght) {
+        conversationHistory[username].shift()
+    }
+}
 
 if (process.env.HACKCLUB_FREE_API) {
     avaliableAiProviders.push('hackclub')
@@ -22,20 +35,31 @@ if (process.env.GROG_FREE_API) {
 
 console.log(`Providers: ${avaliableAiProviders.join(',') || 'NONE'}`)
 
-async function askAI(prompt) {
+async function askAI(prompt, username) {
+    addToHistory(username, 'user', prompt);
+
     if (avaliableAiProviders.includes('hackclub')) {
-        return await askHackClub(prompt)
-        if (result) return result
+        const result = await askHackClub(conversationHistory[username])
+        if (result) {
+            addToHistory(username, 'assistant', result)
+            return result
+        }
     }
 
     if (avaliableAiProviders.includes('groq')) {
-        return await askGroq(prompt)
-        if (result) return result
+        const result = await askGroq(conversationHistory[username])
+        if (result) {
+            addToHistory(username, 'assistant', result)
+            return result
+        }
     }
 
     if (avaliableAiProviders.includes('gemini')) {
-        return await askGemini(prompt)
-        if (result) return result
+        const result = await askGemini(conversationHistory[username])
+        if (result) {
+            addToHistory(username, 'assistant', result)
+            return result
+        }
     }
 
     console.log("You don't insert token into .env")
@@ -125,7 +149,7 @@ for (const test of HackClubModels) {
 testAllModels();
 
 
-async function askHackClub(prompt) {
+async function askHackClub(messages) {
     if (avaliableAiProviders.includes('hackclub')) {
         for (const model of HackClubModels) {
             try {
@@ -136,7 +160,7 @@ async function askHackClub(prompt) {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${process.env.HACKCLUB_FREE_API}`
             },
-            body: JSON.stringify({ model, messages: [{ role: 'user', content: prompt }] })
+            body: JSON.stringify({ model, messages })
         });
 
         if (response.ok) {
@@ -151,7 +175,7 @@ return null
 } 
 }
 
-async function askGroq(prompt) {
+async function askGroq(messages) {
     if (avaliableAiProviders.includes('groq')) {
         for (const model of groqModels) {
             try {
@@ -161,7 +185,7 @@ async function askGroq(prompt) {
                     'Content-Type':'application/json',
                     'Authorization': `Bearer ${process.env.GROG_FREE_API}`
                 },
-                body: JSON.stringify({ model, messages: [{ role: 'user', content: prompt }] })
+                body: JSON.stringify({ model, messages })
             });
 
                 if (response.ok) {
@@ -176,14 +200,22 @@ async function askGroq(prompt) {
     }
 }
 
-async function askGemini(prompt) {
+
+function convertForGemini(messages) {
+    return messages.map(msg => ({
+        role: msg.role === 'assistant' ? 'model' : 'user',
+        parts: [{ text: msg.content }]
+    }))
+}
+
+async function askGemini(messages) {
     if (avaliableAiProviders.includes('gemini')) {
         for (const model of geminiModels) {
             try {
                 const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_FREE_API}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json'},
-                    body: JSON.stringify({ contents: [{ parts: [{ text: prompt}] }] })
+                    body: JSON.stringify({ contents: convertForGemini(messages) })
                 });
                 if (response.ok) {
                     const data = await response.json();
