@@ -29,7 +29,7 @@ if (process.env.GEMINI_FREE_API) {
     avaliableAiProviders.push('gemini')
 }
 
-if (process.env.GROG_FREE_API) {
+if (process.env.GROQ_FREE_API) {
     avaliableAiProviders.push('groq')
 }
 
@@ -117,7 +117,7 @@ async function testGroq(model) {
             method: 'POST',
             headers: {
                 'Content-Type':'application/json',
-                'Authorization': `Bearer ${process.env.GROG_FREE_API}`
+                'Authorization': `Bearer ${process.env.GROQ_FREE_API}`
             },
             body: JSON.stringify({ model, messages: [{ role: 'user', content: 'test' }] })
         })
@@ -183,7 +183,7 @@ async function askGroq(messages) {
                 method: 'POST',
                 headers: {
                     'Content-Type':'application/json',
-                    'Authorization': `Bearer ${process.env.GROG_FREE_API}`
+                    'Authorization': `Bearer ${process.env.GROQ_FREE_API}`
                 },
                 body: JSON.stringify({ model, messages })
             });
