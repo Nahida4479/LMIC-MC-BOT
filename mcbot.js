@@ -256,7 +256,7 @@ bot.on('error', (err) => {
     console.log(`[${date()}] Error: ${err.message}`)
 });
 
-bot.on('chat', (username, message) => {
+bot.on('chat', async (username, message) => {
     if (username === bot.username) return
 
     if (message.toLowerCase().includes(bot.username.toLowerCase())) {
