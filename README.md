@@ -2,7 +2,7 @@
 A Mineflayer-based Minecraft bot integrated with an LLMs API for real-time, context-aware chat and navigation.
 
 ## Requirements
-**You need at least one of the following API keys: Groq, Gemini, or HackClub.**
+> You need at least one of the following API keys: Groq, Gemini, or HackClub.
 
 ### GROQ API
 1. Open [console.groq.com](https://console.groq.com) 
