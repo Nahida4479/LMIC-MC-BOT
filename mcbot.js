@@ -25,17 +25,20 @@ console.log(`Providers: ${avaliableAiProviders.join(',') || 'NONE'}`)
 async function askAI(prompt) {
     if (avaliableAiProviders.includes('hackclub')) {
         return await askHackClub(prompt)
+        if (result) return result
     }
 
     if (avaliableAiProviders.includes('groq')) {
         return await askGroq(prompt)
+        if (result) return result
     }
 
     if (avaliableAiProviders.includes('gemini')) {
         return await askGemini(prompt)
+        if (result) return result
     }
 
-    console.log("You don't insert tocken into .env")
+    console.log("You don't insert token into .env")
     return null
 }
 
@@ -122,11 +125,84 @@ for (const test of HackClubModels) {
 testAllModels();
 
 
+async function askHackClub(prompt) {
+    if (avaliableAiProviders.includes('hackclub')) {
+        for (const model of HackClubModels) {
+            try {
+        
+        const response = await fetch('https://ai.hackclub.com/proxy/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${process.env.HACKCLUB_FREE_API}`
+            },
+            body: JSON.stringify({ model, messages: [{ role: 'user', content: prompt }] })
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            return data.choices[0].message.content
+        }
+    } catch (err) {
+        console.log(`${date()} HackClub model ${model} failed: ${err.message}`)
+    }
+}
+return null
+} 
+}
+
+async function askGroq(prompt) {
+    if (avaliableAiProviders.includes('groq')) {
+        for (const model of groqModels) {
+            try {
+            const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type':'application/json',
+                    'Authorization': `Bearer ${process.env.GROG_FREE_API}`
+                },
+                body: JSON.stringify({ model, messages: [{ role: 'user', content: prompt }] })
+            });
+
+                if (response.ok) {
+                    const data = await response.json()
+                    return data.choices[0].message.content
+                }
+            } catch (err) {
+                console.log(`${date()} Groq model ${model} failed: ${err.message}`)
+            }
+        }
+        return null
+    }
+}
+
+async function askGemini(prompt) {
+    if (avaliableAiProviders.includes('gemini')) {
+        for (const model of geminiModels) {
+            try {
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_FREE_API}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json'},
+                    body: JSON.stringify({ contents: [{ parts: [{ text: prompt}] }] })
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    return data.candidates[0].content.parts[0].text
+                }
+            } catch (err) {
+                console.log(`${date()} Gemini model ${model} failed ${err.message}`)
+            }
+        }
+        return null
+    }
+}
+
+
 function createBot() {
 const bot = mineflayer.createBot({
     host: process.env.SERVER,  // ADD SERVER= in .env
     port: parseInt(process.env.SERVER_PORT), // ADD SERVER_PORT in .env
-    username: process.env.BOT_NAME,
+    username: process.env.BOT_NAME, 
     auth: 'offline' // Offline servers
 });
 
