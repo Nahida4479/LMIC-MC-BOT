@@ -230,6 +230,7 @@ async function askGemini(messages) {
 }
 
 
+
 function createBot() {
 const bot = mineflayer.createBot({
     host: process.env.SERVER,  // ADD SERVER= in .env
@@ -257,7 +258,13 @@ bot.on('error', (err) => {
 
 bot.on('chat', (username, message) => {
     if (username === bot.username) return
-    bot.chat(message)
+
+    if (message.toLowerCase().includes(bot.username.toLowerCase())) {
+        const response = await askAI(message, username)
+        if (response) {
+            bot.chat(response)
+        }
+    }
 });
 }
 
