@@ -72,7 +72,7 @@ Since I don't have a stable 24/7 hosting, you can run the Minecraft server local
 3. Run the server: `java -jar paper-26.2-111.jar` and wait for **Done!** in the console.
 
 | **Server parameter** | **Value** |
-|---|---|
+|:---:|:---:|
 | Authentication | Offline |
 | Port | 25565 |
 | Version | Paper 26.2 |
