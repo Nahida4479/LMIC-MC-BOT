@@ -56,10 +56,8 @@ A Mineflayer-based Minecraft bot integrated with an LLMs API for real-time, cont
 4. Open the `.env` file and paste it into `HACKCLUB_FREE_API=`
 
 ## AI models
-| HackClub | Groq | Gemini |
-|---|---|---|
-| llama-3.3-70b-instruct | llama-3.3-70b-versatile | gemini-2.5-flash |
-|  | llama-3.1-8b-instant | gemini-2.5-flash-lite |
-|  | gpt-oss-120b |  |
-|  | gpt-oss-20b |  |
-|  | qwen3.6-27b |  |
+| Provider | Models |
+|---|---|
+| Groq | llama-3.3-70b-versatile, llama-3.1-8b-instant, openai/gpt-oss-120b, openai/gpt-oss-20b, qwen/qwen3.6-27b |
+| Gemini | gemini-2.5-flash, gemini-2.5-flash-lite |
+| HackClub | meta-llama/llama-3.3-70b-instruct |
