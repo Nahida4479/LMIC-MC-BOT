@@ -61,3 +61,19 @@ A Mineflayer-based Minecraft bot integrated with an LLMs API for real-time, cont
 | Groq | llama-3.3-70b-versatile, llama-3.1-8b-instant, gpt-oss-120b, gpt-oss-20b, qwen3.6-27b |
 | Gemini | gemini-2.5-flash, gemini-2.5-flash-lite |
 | HackClub | llama-3.3-70b-instruct |
+
+## Bot testing options
+Since I don't have a stable 24/7 hosting, you can run the Minecraft server locally to test the bot:
+
+1. Install [Java](https://www.oracle.com/pl/java/technologies/downloads/)
+
+2. Go to repository folder `test-minecraft-server-paper-26.2`
+
+3. Run the server: `java -jar paper-26.2-111.jar` and wait for **Done!** in the console.
+
+| **Server parameter** | **Value** |
+|---|---|
+| Authentication | Offline |
+| Port | 25565 |
+| Version | Paper 26.2 |
+| Plugins | ViaVersion, ViaBackwards |
