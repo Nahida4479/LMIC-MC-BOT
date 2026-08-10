@@ -1,5 +1,8 @@
 const mineflayer = require('mineflayer');
 const mineflayer_pvp = require('mineflayer-pvp');
+const pathfinder = require('mineflayer-pathfinder').pathfinder;
+const Movements = require('mineflayer-pathfinder').Movements;
+const { GoalNear } = require('mineflayer-pathfinder').goals;
 require('dotenv').config();
 
 function date() {
@@ -10,6 +13,8 @@ const avaliableAiProviders = []
 const conversationHistory = {}
 const maxHistoryLenght = 20;
 let reconnecting = false;
+let defaultMove;
+
 function addToHistory(username, role, content) {
     if (!conversationHistory[username]) {
         conversationHistory[username] = []
@@ -240,8 +245,12 @@ const bot = mineflayer.createBot({
     auth: 'offline' // Offline servers
 });
 
+bot.loadPlugin(pathfinder);
+
 bot.once('spawn', () => {
     console.log(`[${date()}] ${bot.username} active`);
+    defaultMove = new Movements(bot);
+
 });
 
 bot.on('end', (reason) => {
@@ -267,6 +276,18 @@ bot.on('error', (err) => {
 bot.on('chat', async (username, message) => {
     if (username === bot.username) return
 
+    const target = bot.players[username] ? bot.players[username].entity : null;
+    if (message === 'look') {
+        if (!target) {
+            bot.chat(`I don't see you`)
+            return
+        }
+        const p = target.position
+
+        bot.pathfinder.setMovements(defaultMove);
+        bot.pathfinder.setGoal(new GoalNear(p.x, p.y, p.z, 1))
+    }
+
     if (message.toLowerCase().includes(bot.username.toLowerCase())) {
         const response = await askAI(message, username)
         if (response) {
@@ -279,7 +300,9 @@ bot.on('chat', async (username, message) => {
 process.on('uncaughtException', (err) => {
     console.log(`${date()} Critical error: ${err.message}`)
     console.log('Reconnecting...')
-    setTimeout(createBot, 2000)
-});
+    if (!reconnecting) {
+        reconnecting = true;
+        setTimeout(createBot, 2000);
+    }});
 
 createBot();
