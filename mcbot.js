@@ -9,7 +9,7 @@ function date() {
 const avaliableAiProviders = []
 const conversationHistory = {}
 const maxHistoryLenght = 20;
-
+let reconnecting = false;
 function addToHistory(username, role, content) {
     if (!conversationHistory[username]) {
         conversationHistory[username] = []
@@ -232,6 +232,7 @@ async function askGemini(messages) {
 
 
 function createBot() {
+reconnecting = false;
 const bot = mineflayer.createBot({
     host: process.env.SERVER,  // ADD SERVER= in .env
     port: parseInt(process.env.SERVER_PORT), // ADD SERVER_PORT in .env
@@ -245,7 +246,10 @@ bot.once('spawn', () => {
 
 bot.on('end', (reason) => {
     console.log(`[${date()}] ${bot.username} disconnected (${reason}). Reconnecting...` )
-    setTimeout(createBot, 2000)
+    if (!reconnecting) {
+        reconnecting = true;
+        setTimeout(createBot, 2000)
+    }
 });
 
 bot.on('kicked', (reason) => {
@@ -254,6 +258,10 @@ bot.on('kicked', (reason) => {
 
 bot.on('error', (err) => {
     console.log(`[${date()}] Error: ${err.message}`)
+    if (!reconnecting) {
+        reconnecting = true;
+        setTimeout(createBot, 2000);
+    }
 });
 
 bot.on('chat', async (username, message) => {
