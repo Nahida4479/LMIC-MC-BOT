@@ -18,6 +18,7 @@ const maxHistoryLenght = 20;
 let reconnecting = false;
 let defaultMove;
 let botBusy = false;
+let followingPlayer = null;
 
 function addToHistory(username, role, content) {
     if (!conversationHistory[username]) {
@@ -250,6 +251,7 @@ async function interpretCommand(message) {
     - "amount": the requested quantity (default 1 if not specified)
     
     If message is anything else, use "action": "chat".
+    Please answer in maximum 1-2 short sentences, this is a Minecraft chat with limited message length
     
     Player message: "${message}"
     
@@ -291,6 +293,7 @@ bot.once('spawn', () => {
     console.log(`[${date()}] ${bot.username} active`);
     defaultMove = new Movements(bot);
     console.log("collectBlock type:", typeof bot.collectBlock);
+    defaultMove.canDig = true;
 
 });
 
@@ -323,6 +326,70 @@ bot.on('chat', async (username, message) => {
     console.log("Block under bot:", nearbyBlock ? nearbyBlock.name : "none")
     console.log("Bot inventory:", bot.inventory.items().map(item => item.name + " x" + item.count))
 
+
+function startFollowingPlayer(username) {
+    followingPlayer = username  
+}
+
+function stopFollowingPlayer(username) {
+    followingPlayer = null
+}
+
+startFollowingPlayer(username)
+
+async function goToPlayer(target) {
+    const p = target.position
+    bot.pathfinder.setMovements(defaultMove);
+    bot.pathfinder.setGoal(new GoalNear(p.x, p.y, p.z, 1))
+
+    await new Promise((resolve) => {
+        setTimeout(resolve, 5000)
+    })
+}
+
+function isBotTrapped() {
+    const pos = bot.entity.position;
+    const above = bot.blockAt(pos.offset(0, 1 , 0))
+    const aboveAbove = bot.blockAt(pos.offset(0, 2, 0))
+
+    if (above && above.name !== "air") {
+        if (aboveAbove && aboveAbove.name !== "air") {
+            return true
+        }
+    }
+    return false
+}
+
+async function digOut() {
+    while (isBotTrapped()) {
+        const above = bot.blockAt(bot.entity.position.offset(0, 1, 0))
+        if (above && above.name !== "air") {
+            await bot.dig(above)
+        }
+    }
+}
+
+setInterval(() => {
+    if (!followingPlayer) {
+        return
+    }
+    if (botBusy) {
+        return
+    }
+
+    const player = bot.players[followingPlayer]
+    if (!player || !player.entity) {
+        return
+    }
+
+    const distanse = bot.entity.position.distanceTo(player.entity.position)
+
+    if (distanse > 1) {
+        const p = player.entity.position;
+        bot.pathfinder.setMovements(defaultMove)
+        bot.pathfinder.setGoal(new GoalNear(p.x, p.y, p.z, 5))
+    }
+}, 3000)
     async function gatherBlocks(blockName, amount) {
         let collected = 0;
 
@@ -338,6 +405,11 @@ bot.on('chat', async (username, message) => {
             if (!targetBlock) {
                 return collected
             }
+
+            if (targetBlock.position.y < bot.entity.position.y -2) {
+                return collected
+            }
+
             try {
             await Promise.race([
                 bot.collectBlock.collect(targetBlock),
@@ -365,9 +437,20 @@ bot.on('chat', async (username, message) => {
         }
 
         botBusy = true
-        bot.chat(`No problem! Collecting ${interpretation.amount}x ${interpretation.block}`)
+        const noProblem = languages.getMessage(interpretation.language, "noProblem")
+
+        bot.chat(`${noProblem} ${interpretation.amount}x ${interpretation.block}`)
 
         const collected = await gatherBlocks(interpretation.block, interpretation.amount) 
+
+        if (isBotTrapped()) {
+            console.log("Bot got stuck, wait");
+            await digOut();
+        }
+
+        if (target) {
+            await goToPlayer(target)
+        }
 
         if (collected < interpretation.amount) {
             const text = translations.getMessage(interpretation.language, "foundOnly")
@@ -380,18 +463,7 @@ bot.on('chat', async (username, message) => {
         return
     }
 
-// Look
-    if (message === 'look') {
-            if (!target) {
-                bot.chat(languages.getMessage(interpretation.language, "dontSeeYou"))
-                return
-        }
-        const p = target.position
 
-        bot.pathfinder.setMovements(defaultMove);
-        bot.pathfinder.setGoal(new GoalNear(p.x, p.y, p.z, 1))
-        return
-    }
 
         const response = await askAI(message, username)
         if (response) {
