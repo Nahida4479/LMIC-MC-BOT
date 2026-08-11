@@ -4,6 +4,8 @@ const pathfinder = require('mineflayer-pathfinder').pathfinder;
 const Movements = require('mineflayer-pathfinder').Movements;
 const { GoalNear } = require('mineflayer-pathfinder').goals;
 const collectBlock = require('mineflayer-collectblock').plugin
+const translations = require('./languages/languages');
+const languages = require('./languages/languages');
 require('dotenv').config();
 
 function date() {
@@ -242,6 +244,7 @@ async function interpretCommand(message) {
     or
     {"action": "chat", "block": null, "amount": null} 
     
+    For language, use \"pl\" if the player wrote in Polish, otherwise use \"en\". 
     If the message asks the collect/gather/mine any resource, use "collect" with:
     - "block": the Minecraft official block name in English, lowercase, using underscores (e.g. "oak_log", "diamont_ore", "iron_ore", "cobblestone")
     - "amount": the requested quantity (default 1 if not specified)
@@ -332,7 +335,7 @@ bot.on('chat', async (username, message) => {
 
     if (interpretation.action === 'collect') {
         if (botBusy) {
-            bot.chat('I am busy right now')
+            bot.chat(translations.getMessage(interpretation.language, "busy"))
             return
         }
 
@@ -342,9 +345,11 @@ bot.on('chat', async (username, message) => {
         const collected = await collectBlocks(interpretation.block, interpretation.amount) 
 
         if (collected < interpretation.amount) {
-            bot.chat(`I could only find ${collected}/${interpretation.amount} ${interpretation.block}`)
+            const text = translations.getMessage(interpretation.language, "foundOnly")
+            bot.chat(`${text} ${collected}/${interpretation.amount} ${interpretation.block}`)
         } else {
-            bot.chat(`I collected ${collected}x ${interpretation.block}`)
+            const text = translations.getMessage(interpretation.language, "collected")
+            bot.chat(`${text} ${collected}x ${interpretation.block}`)
         }
         botBusy = false
         return
@@ -353,7 +358,7 @@ bot.on('chat', async (username, message) => {
 // Look
     if (message === 'look') {
             if (!target) {
-                bot.chat(`I don't see you`)
+                bot.chat(languages.getMessage(interpretation.language, "dontSeeYou"))
                 return
         }
         const p = target.position
