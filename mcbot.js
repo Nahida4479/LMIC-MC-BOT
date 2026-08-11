@@ -252,7 +252,7 @@ async function interpretCommand(message) {
     
     If message is anything else, use "action": "chat".
     Please answer in maximum 1-2 short sentences, this is a Minecraft chat with limited message length
-    
+
     Player message: "${message}"
     
     Respond ONLY with the JSON, NOTHING ELSE.`
@@ -284,6 +284,7 @@ const bot = mineflayer.createBot({
     port: parseInt(process.env.SERVER_PORT), // ADD SERVER_PORT in .env
     username: process.env.BOT_NAME, 
     auth: 'offline' // Offline servers
+
 });
 
 bot.loadPlugin(pathfinder);
@@ -294,7 +295,8 @@ bot.once('spawn', () => {
     defaultMove = new Movements(bot);
     console.log("collectBlock type:", typeof bot.collectBlock);
     defaultMove.canDig = true;
-
+    defaultMove.allowParkour = true;
+    defaultMove.scafoldingBlocks.push(bot.registry.itemsByName['dirt'].id);
 });
 
 bot.on('end', (reason) => {
@@ -307,6 +309,10 @@ bot.on('end', (reason) => {
 
 bot.on('kicked', (reason) => {
     console.log(`[${date()}] ${bot.username} kicked (${reason})`)
+    if (!reconnecting) {
+        reconnecting = true;
+        setTimeout(createBot, 2000);
+    }
 });
 
 bot.on('error', (err) => {
@@ -327,15 +333,14 @@ bot.on('chat', async (username, message) => {
     console.log("Bot inventory:", bot.inventory.items().map(item => item.name + " x" + item.count))
 
 
-function startFollowingPlayer(username) {
-    followingPlayer = username  
-}
-
-function stopFollowingPlayer(username) {
-    followingPlayer = null
-}
-
 startFollowingPlayer(username)
+
+function forceJump() {
+    bot.setControlState("jump", true)
+    setTimeout(() => {
+        bot.setControlState("jump", false)
+    }, 500);
+}
 
 async function goToPlayer(target) {
     const p = target.position
@@ -370,6 +375,7 @@ async function digOut() {
 }
 
 setInterval(() => {
+    let lastPosition = null;
     if (!followingPlayer) {
         return
     }
@@ -388,8 +394,14 @@ setInterval(() => {
         const p = player.entity.position;
         bot.pathfinder.setMovements(defaultMove)
         bot.pathfinder.setGoal(new GoalNear(p.x, p.y, p.z, 5))
+
+        if (lastPosition && bot.entity.position.distanceTo(lastPosition) < 0.1) {
+            forceJump();
+        }
+
+        lastPosition = bot.entity.position.clone();
     }
-}, 3000)
+}, 8000)
     async function gatherBlocks(blockName, amount) {
         let collected = 0;
 
