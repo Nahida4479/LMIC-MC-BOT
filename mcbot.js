@@ -332,6 +332,13 @@ bot.on('chat', async (username, message) => {
     console.log("Block under bot:", nearbyBlock ? nearbyBlock.name : "none")
     console.log("Bot inventory:", bot.inventory.items().map(item => item.name + " x" + item.count))
 
+function startFollowingPlayer(username) {
+    followingPlayer = username
+}
+
+function stopFollowing() {
+    followingPlayer = null
+}
 
 startFollowingPlayer(username)
 
@@ -365,6 +372,16 @@ function isBotTrapped() {
     return false
 }
 
+function forceMove() {
+    bot.setControlState("forward", true)
+    bot.setControlState("jump", true)
+
+    setTimeout(() => {
+        bot.setControlState("forward", false)
+        bot.setControlState("jump", false)
+    }, 1000)
+}
+
 async function digOut() {
     while (isBotTrapped()) {
         const above = bot.blockAt(bot.entity.position.offset(0, 1, 0))
@@ -373,9 +390,9 @@ async function digOut() {
         }
     }
 }
-
+let lastPosition = null;
 setInterval(() => {
-    let lastPosition = null;
+    
     if (!followingPlayer) {
         return
     }
@@ -404,6 +421,7 @@ setInterval(() => {
 }, 8000)
     async function gatherBlocks(blockName, amount) {
         let collected = 0;
+        let lastGatherPosition = null;
 
         while (collected < amount) {
             const targetBlock = bot.findBlock({
@@ -420,6 +438,10 @@ setInterval(() => {
 
             if (targetBlock.position.y < bot.entity.position.y -2) {
                 return collected
+            }
+
+            if (lastGatherPosition && bot.entity.position.distanceTo(lastGatherPosition) < 0.1) {
+                forceJump();
             }
 
             try {
