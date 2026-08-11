@@ -1,5 +1,5 @@
 const mineflayer = require('mineflayer');
-const mineflayer_pvp = require('mineflayer-pvp');
+//const mineflayer_pvp = require('mineflayer-pvp');
 const pathfinder = require('mineflayer-pathfinder').pathfinder;
 const Movements = require('mineflayer-pathfinder').Movements;
 const { GoalNear } = require('mineflayer-pathfinder').goals;
@@ -240,13 +240,13 @@ async function askGemini(messages) {
 
 async function interpretCommand(message) {
     const prompt = `You are a Minecraft bot command interpreter. Analyze the pleyer,s message and respond ONLY with JSON in this exact format:
-    {"action": "collect", "block": "<minecraft_block_name>", "amount": <number>}
+    {"action": "collect", "block": "<minecraft_block_name>", "amount": <number>, "language": "<pl_or_en>"}
     or
-    {"action": "chat", "block": null, "amount": null} 
-    
-    For language, use \"pl\" if the player wrote in Polish, otherwise use \"en\". 
+    {"action": "chat", "block": null, "amount": null, "language": "<pl_or_en>"}
+
+    Use "pl" for language if the player wrote in Polish, otherwise use "en". 
     If the message asks the collect/gather/mine any resource, use "collect" with:
-    - "block": the Minecraft official block name in English, lowercase, using underscores (e.g. "oak_log", "diamont_ore", "iron_ore", "cobblestone")
+    - "block": the Minecraft official block name in English, lowercase, using underscores (e.g. "oak_log", "diamont_ore", "iron_ore", "cobblestone", grass_block)
     - "amount": the requested quantity (default 1 if not specified)
     
     If message is anything else, use "action": "chat".
@@ -267,6 +267,13 @@ async function interpretCommand(message) {
 
 }
 
+function timeout(ms) {
+    return new Promise((resolve, reject) => {
+        setTimeout(() => {
+            reject(new Error("Timeout"))
+        }, ms)
+    })
+}
 
 function createBot() {
 reconnecting = false;
@@ -283,6 +290,7 @@ bot.loadPlugin(collectBlock);
 bot.once('spawn', () => {
     console.log(`[${date()}] ${bot.username} active`);
     defaultMove = new Movements(bot);
+    console.log("collectBlock type:", typeof bot.collectBlock);
 
 });
 
@@ -311,21 +319,38 @@ bot.on('chat', async (username, message) => {
     if (!message.toLowerCase().includes(bot.username.toLowerCase())) return
     const target = bot.players[username] ? bot.players[username].entity : null;
 
-    async function collectBlocks(blockName, amount) {
+    const nearbyBlock = bot.blockAt(bot.entity.position.offset(0, -1, 0))
+    console.log("Block under bot:", nearbyBlock ? nearbyBlock.name : "none")
+    console.log("Bot inventory:", bot.inventory.items().map(item => item.name + " x" + item.count))
+
+    async function gatherBlocks(blockName, amount) {
         let collected = 0;
 
         while (collected < amount) {
             const targetBlock = bot.findBlock({
                 matching: (block) => block.name === blockName,
-                maxDistance: 64
+                maxDistance: 32
             })
+
+            console.log("Bot position:", bot.entity.position)
+            console.log("Target block found:", targetBlock ? targetBlock.position : 'none')
 
             if (!targetBlock) {
                 return collected
             }
-
-            await bot.collectBlocks.collect(targetBlock)
+            try {
+            await Promise.race([
+                bot.collectBlock.collect(targetBlock),
+                timeout(60000)
+            ]) 
             collected++
+            console.log("Successfully collected! Total:", collected)
+            console.log("Bot inventory:", bot.inventory.items().map(item => item.name + " x" + item.count))
+
+            } catch (err) {
+                console.log(`Failed to collect: ${err.message}`)
+                return collected
+            }
         }
         return collected
     }
@@ -342,7 +367,7 @@ bot.on('chat', async (username, message) => {
         botBusy = true
         bot.chat(`No problem! Collecting ${interpretation.amount}x ${interpretation.block}`)
 
-        const collected = await collectBlocks(interpretation.block, interpretation.amount) 
+        const collected = await gatherBlocks(interpretation.block, interpretation.amount) 
 
         if (collected < interpretation.amount) {
             const text = translations.getMessage(interpretation.language, "foundOnly")
