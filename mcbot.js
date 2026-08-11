@@ -3,6 +3,7 @@ const mineflayer_pvp = require('mineflayer-pvp');
 const pathfinder = require('mineflayer-pathfinder').pathfinder;
 const Movements = require('mineflayer-pathfinder').Movements;
 const { GoalNear } = require('mineflayer-pathfinder').goals;
+const collectBlock = require('mineflayer-collectblock').plugin
 require('dotenv').config();
 
 function date() {
@@ -14,6 +15,7 @@ const conversationHistory = {}
 const maxHistoryLenght = 20;
 let reconnecting = false;
 let defaultMove;
+let botBusy = false;
 
 function addToHistory(username, role, content) {
     if (!conversationHistory[username]) {
@@ -234,6 +236,33 @@ async function askGemini(messages) {
     }
 }
 
+async function interpretCommand(message) {
+    const prompt = `You are a Minecraft bot command interpreter. Analyze the pleyer,s message and respond ONLY with JSON in this exact format:
+    {"action": "collect", "block": "<minecraft_block_name>", "amount": <number>}
+    or
+    {"action": "chat", "block": null, "amount": null} 
+    
+    If the message asks the collect/gather/mine any resource, use "collect" with:
+    - "block": the Minecraft official block name in English, lowercase, using underscores (e.g. "oak_log", "diamont_ore", "iron_ore", "cobblestone")
+    - "amount": the requested quantity (default 1 if not specified)
+    
+    If message is anything else, use "action": "chat".
+    
+    Player message: "${message}"
+    
+    Respond ONLY with the JSON, NOTHING ELSE.`
+    
+    const response = await askAI(prompt, 'system_interpreter') 
+    
+    try {
+        const cleaned = response.replace(/```json|```/g, '').trim()
+        return JSON.parse(cleaned)
+    } catch (err) {
+        console.log(`Failed to parse AI response: ${response}`)
+        return { action: 'chat', block: null, amount: null}
+    }
+
+}
 
 
 function createBot() {
@@ -246,6 +275,7 @@ const bot = mineflayer.createBot({
 });
 
 bot.loadPlugin(pathfinder);
+bot.loadPlugin(collectBlock);
 
 bot.once('spawn', () => {
     console.log(`[${date()}] ${bot.username} active`);
@@ -275,24 +305,67 @@ bot.on('error', (err) => {
 
 bot.on('chat', async (username, message) => {
     if (username === bot.username) return
-
+    if (!message.toLowerCase().includes(bot.username.toLowerCase())) return
     const target = bot.players[username] ? bot.players[username].entity : null;
-    if (message === 'look') {
-        if (!target) {
-            bot.chat(`I don't see you`)
+
+    async function collectBlocks(blockName, amount) {
+        let collected = 0;
+
+        while (collected < amount) {
+            const targetBlock = bot.findBlock({
+                matching: (block) => block.name === blockName,
+                maxDistance: 64
+            })
+
+            if (!targetBlock) {
+                return collected
+            }
+
+            await bot.collectBlocks.collect(targetBlock)
+            collected++
+        }
+        return collected
+    }
+
+
+    const interpretation = await interpretCommand(message)
+
+    if (interpretation.action === 'collect') {
+        if (botBusy) {
+            bot.chat('I am busy right now')
             return
+        }
+
+        botBusy = true
+        bot.chat(`No problem! Collecting ${interpretation.amount}x ${interpretation.block}`)
+
+        const collected = await collectBlocks(interpretation.block, interpretation.amount) 
+
+        if (collected < interpretation.amount) {
+            bot.chat(`I could only find ${collected}/${interpretation.amount} ${interpretation.block}`)
+        } else {
+            bot.chat(`I collected ${collected}x ${interpretation.block}`)
+        }
+        botBusy = false
+        return
+    }
+
+// Look
+    if (message === 'look') {
+            if (!target) {
+                bot.chat(`I don't see you`)
+                return
         }
         const p = target.position
 
         bot.pathfinder.setMovements(defaultMove);
         bot.pathfinder.setGoal(new GoalNear(p.x, p.y, p.z, 1))
+        return
     }
 
-    if (message.toLowerCase().includes(bot.username.toLowerCase())) {
         const response = await askAI(message, username)
         if (response) {
             bot.chat(response)
-        }
     }
 });
 }
