@@ -301,60 +301,6 @@ function stopFollowing() {
     followingPlayer = null
 }
 
-async function forceMove() {
-    const yaw = bot.entity.yaw;
-    const savedTarget = bot.pvp.target
-    bot.clearControlStates()
-
-    if (savedTarget) {
-        bot.pvp.stop();
-    }
-
-    console.log("forceMove before:", bot.getControlState("jump"))
-    bot.setControlState("forward", true)
-    bot.setControlState("jump", true)
-
-    console.log("forceMove after:",bot.getControlState("jump") )
-    await new Promise((resolve) => {
-        setTimeout(resolve, 800)
-    });
-
-    bot.setControlState("jump", false)
-    bot.setControlState("forward", false)
-
-    if (savedTarget) {
-        bot.pvp.attack(savedTarget)
-    }
-}
-
-setInterval(async () => {
-    if (!bot.entity) {
-        return;
-    }
-
-    const currentPos = bot.entity.position;
-
-    if (lastUniversalPosition) {
-        const moved = currentPos.distanceTo(lastUniversalPosition);
-
-        const isDoingSomething = botBusy || (bot.pvp && bot.pvp.target) || followingPlayer
-        console.log("moved:", moved.toFixed(3), "isDoingSomething:", isDoingSomething, "stuckCounter:", stuckCounter)
-        if (isDoingSomething && moved < 0.05) {
-            stuckCounter = stuckCounter + 1
-        } else {
-            stuckCounter = 0
-        }
-
-        if (stuckCounter >= 2) {
-            console.log("Bot stuck- forcing jump")
-            await forceMove()
-            stuckCounter = 0;
-        }
-    }
-
-    lastUniversalPosition = currentPos.clone();
-}, 4000);
-
 async function goToPlayer(target) {
     const p = target.position
     bot.pathfinder.setMovements(defaultMove);
@@ -419,8 +365,9 @@ bot.once('spawn', () => {
     defaultMove.canDig = true;
     defaultMove.allowParkour = true;
     defaultMove.scafoldingBlocks.push(bot.registry.itemsByName['dirt'].id);
-
-
+    bot.setControlState("forward", true)
+    bot.setControlState("sprint", true)
+    bot.setControlState("jump", true)
 });
 
 bot.on('end', (reason) => {
