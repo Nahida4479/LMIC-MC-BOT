@@ -342,12 +342,12 @@ function stopFollowing() {
 
 startFollowingPlayer(username)
 
-function forceJump() {
-    bot.setControlState("jump", true)
-    setTimeout(() => {
-        bot.setControlState("jump", false)
-    }, 500);
-}
+// function forceJump() {
+//     bot.setControlState("jump", true)
+//     setTimeout(() => {
+//         bot.setControlState("jump", false)
+//     }, 500);
+// }
 
 async function goToPlayer(target) {
     const p = target.position
@@ -372,15 +372,15 @@ function isBotTrapped() {
     return false
 }
 
-function forceMove() {
-    bot.setControlState("forward", true)
-    bot.setControlState("jump", true)
+// function forceMove() {
+//     bot.setControlState("forward", true)
+//     bot.setControlState("jump", true)
 
-    setTimeout(() => {
-        bot.setControlState("forward", false)
-        bot.setControlState("jump", false)
-    }, 1000)
-}
+//     setTimeout(() => {
+//         bot.setControlState("forward", false)
+//         bot.setControlState("jump", false)
+//     }, 1000)
+// }
 
 async function digOut() {
     while (isBotTrapped()) {
@@ -407,14 +407,11 @@ setInterval(() => {
 
     const distanse = bot.entity.position.distanceTo(player.entity.position)
 
-    if (distanse > 1) {
+    if (distanse > 10) {
         const p = player.entity.position;
         bot.pathfinder.setMovements(defaultMove)
         bot.pathfinder.setGoal(new GoalNear(p.x, p.y, p.z, 5))
 
-        if (lastPosition && bot.entity.position.distanceTo(lastPosition) < 0.1) {
-            forceJump();
-        }
 
         lastPosition = bot.entity.position.clone();
     }
@@ -440,9 +437,6 @@ setInterval(() => {
                 return collected
             }
 
-            if (lastGatherPosition && bot.entity.position.distanceTo(lastGatherPosition) < 0.1) {
-                forceJump();
-            }
 
             try {
             await Promise.race([
