@@ -19,6 +19,8 @@ let reconnecting = false;
 let defaultMove;
 let botBusy = false;
 let followingPlayer = null;
+let lastUniversalPosition;
+let stuckCounter = 0;
 
 function addToHistory(username, role, content) {
     if (!conversationHistory[username]) {
@@ -291,6 +293,125 @@ bot.loadPlugin(pathfinder);
 bot.loadPlugin(collectBlock);
 bot.loadPlugin(mineflayer_pvp)
 
+function startFollowingPlayer(username) {
+    followingPlayer = username
+}
+
+function stopFollowing() {
+    followingPlayer = null
+}
+
+async function forceMove() {
+    const yaw = bot.entity.yaw;
+    const savedTarget = bot.pvp.target
+    bot.clearControlStates()
+
+    if (savedTarget) {
+        bot.pvp.stop();
+    }
+
+    console.log("forceMove before:", bot.getControlState("jump"))
+    bot.setControlState("forward", true)
+    bot.setControlState("jump", true)
+
+    console.log("forceMove after:",bot.getControlState("jump") )
+    await new Promise((resolve) => {
+        setTimeout(resolve, 800)
+    });
+
+    bot.setControlState("jump", false)
+    bot.setControlState("forward", false)
+
+    if (savedTarget) {
+        bot.pvp.attack(savedTarget)
+    }
+}
+
+setInterval(async () => {
+    if (!bot.entity) {
+        return;
+    }
+
+    const currentPos = bot.entity.position;
+
+    if (lastUniversalPosition) {
+        const moved = currentPos.distanceTo(lastUniversalPosition);
+
+        const isDoingSomething = botBusy || (bot.pvp && bot.pvp.target) || followingPlayer
+        console.log("moved:", moved.toFixed(3), "isDoingSomething:", isDoingSomething, "stuckCounter:", stuckCounter)
+        if (isDoingSomething && moved < 0.05) {
+            stuckCounter = stuckCounter + 1
+        } else {
+            stuckCounter = 0
+        }
+
+        if (stuckCounter >= 2) {
+            console.log("Bot stuck- forcing jump")
+            await forceMove()
+            stuckCounter = 0;
+        }
+    }
+
+    lastUniversalPosition = currentPos.clone();
+}, 4000);
+
+async function goToPlayer(target) {
+    const p = target.position
+    bot.pathfinder.setMovements(defaultMove);
+    bot.pathfinder.setGoal(new GoalNear(p.x, p.y, p.z, 1))
+
+    await new Promise((resolve) => {
+        setTimeout(resolve, 5000)
+    })
+}
+
+function isBotTrapped() {
+    const pos = bot.entity.position;
+    const above = bot.blockAt(pos.offset(0, 1 , 0))
+    const aboveAbove = bot.blockAt(pos.offset(0, 2, 0))
+
+    if (above && above.name !== "air") {
+        if (aboveAbove && aboveAbove.name !== "air") {
+            return true
+        }
+    }
+    return false
+}
+async function digOut() {
+    while (isBotTrapped()) {
+        const above = bot.blockAt(bot.entity.position.offset(0, 1, 0))
+        if (above && above.name !== "air") {
+            await bot.dig(above)
+        }
+    }
+}
+
+setInterval(() => {
+    
+    if (!followingPlayer) {
+        return
+    }
+    if (botBusy) {
+        return
+    }
+
+    const player = bot.players[followingPlayer]
+    if (!player || !player.entity) {
+        return
+    }
+
+    const distanse = bot.entity.position.distanceTo(player.entity.position)
+
+    if (distanse > 10) {
+        const p = player.entity.position;
+        bot.pathfinder.setMovements(defaultMove)
+        bot.pathfinder.setGoal(new GoalNear(p.x, p.y, p.z, 5))
+
+
+        lastPosition = bot.entity.position.clone();
+    }
+}, 8000)
+
 bot.once('spawn', () => {
     console.log(`[${date()}] ${bot.username} active`);
     defaultMove = new Movements(bot);
@@ -298,6 +419,8 @@ bot.once('spawn', () => {
     defaultMove.canDig = true;
     defaultMove.allowParkour = true;
     defaultMove.scafoldingBlocks.push(bot.registry.itemsByName['dirt'].id);
+
+
 });
 
 bot.on('end', (reason) => {
@@ -333,90 +456,10 @@ bot.on('chat', async (username, message) => {
     console.log("Block under bot:", nearbyBlock ? nearbyBlock.name : "none")
     console.log("Bot inventory:", bot.inventory.items().map(item => item.name + " x" + item.count))
 
-function startFollowingPlayer(username) {
-    followingPlayer = username
-}
-
-function stopFollowing() {
-    followingPlayer = null
-}
 
 startFollowingPlayer(username)
-
-// function forceJump() {
-//     bot.setControlState("jump", true)
-//     setTimeout(() => {
-//         bot.setControlState("jump", false)
-//     }, 500);
-// }
-
-async function goToPlayer(target) {
-    const p = target.position
-    bot.pathfinder.setMovements(defaultMove);
-    bot.pathfinder.setGoal(new GoalNear(p.x, p.y, p.z, 1))
-
-    await new Promise((resolve) => {
-        setTimeout(resolve, 5000)
-    })
-}
-
-function isBotTrapped() {
-    const pos = bot.entity.position;
-    const above = bot.blockAt(pos.offset(0, 1 , 0))
-    const aboveAbove = bot.blockAt(pos.offset(0, 2, 0))
-
-    if (above && above.name !== "air") {
-        if (aboveAbove && aboveAbove.name !== "air") {
-            return true
-        }
-    }
-    return false
-}
-
-// function forceMove() {
-//     bot.setControlState("forward", true)
-//     bot.setControlState("jump", true)
-
-//     setTimeout(() => {
-//         bot.setControlState("forward", false)
-//         bot.setControlState("jump", false)
-//     }, 1000)
-// }
-
-async function digOut() {
-    while (isBotTrapped()) {
-        const above = bot.blockAt(bot.entity.position.offset(0, 1, 0))
-        if (above && above.name !== "air") {
-            await bot.dig(above)
-        }
-    }
-}
 let lastPosition = null;
-setInterval(() => {
-    
-    if (!followingPlayer) {
-        return
-    }
-    if (botBusy) {
-        return
-    }
 
-    const player = bot.players[followingPlayer]
-    if (!player || !player.entity) {
-        return
-    }
-
-    const distanse = bot.entity.position.distanceTo(player.entity.position)
-
-    if (distanse > 10) {
-        const p = player.entity.position;
-        bot.pathfinder.setMovements(defaultMove)
-        bot.pathfinder.setGoal(new GoalNear(p.x, p.y, p.z, 5))
-
-
-        lastPosition = bot.entity.position.clone();
-    }
-}, 8000)
     async function gatherBlocks(blockName, amount) {
         let collected = 0;
         let lastGatherPosition = null;
@@ -493,7 +536,7 @@ setInterval(() => {
     }
 
 
-    if (message === 'fight me') {
+    if (message.toLowerCase().includes('fight me')  ) {
         const player = bot.players[username];
         botBusy = true;
 
@@ -502,12 +545,14 @@ setInterval(() => {
             bot.chat(`${dontSeeYou}`)
             return
         }
-
-        bot.pvp.attack(player.entity)
+        
+        bot.pvp.movements = defaultMove;
+        bot.pvp.followRange= 3;       
+        bot.pvp.attack(player.entity);
         return;
     }
 
-    if (message === 'stop') {
+    if (message.toLowerCase().includes('stop')) {
         bot.pvp.stop();
         botBusy = false;
         return;
