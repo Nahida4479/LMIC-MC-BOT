@@ -1,5 +1,5 @@
 const mineflayer = require('mineflayer');
-//const mineflayer_pvp = require('mineflayer-pvp');
+const mineflayer_pvp = require('mineflayer-pvp').plugin;
 const pathfinder = require('mineflayer-pathfinder').pathfinder;
 const Movements = require('mineflayer-pathfinder').Movements;
 const { GoalNear } = require('mineflayer-pathfinder').goals;
@@ -289,6 +289,7 @@ const bot = mineflayer.createBot({
 
 bot.loadPlugin(pathfinder);
 bot.loadPlugin(collectBlock);
+bot.loadPlugin(mineflayer_pvp)
 
 bot.once('spawn', () => {
     console.log(`[${date()}] ${bot.username} active`);
@@ -492,7 +493,25 @@ setInterval(() => {
     }
 
 
+    if (message === 'fight me') {
+        const player = bot.players[username];
+        botBusy = true;
 
+        if (!player) {
+            const dontSeeYou = languages.getMessage(interpretation.language, "dontSeeYou")
+            bot.chat(`${dontSeeYou}`)
+            return
+        }
+
+        bot.pvp.attack(player.entity)
+        return;
+    }
+
+    if (message === 'stop') {
+        bot.pvp.stop();
+        botBusy = false;
+        return;
+    }
         const response = await askAI(message, username)
         if (response) {
             bot.chat(response)
