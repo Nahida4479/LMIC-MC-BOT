@@ -308,7 +308,7 @@ function sendChat(text) {
 
     const oneLine = text.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
 
-    if (oneLine.lenght > 200) {
+    if (oneLine.length > 200) {
         bot.chat(oneLine.substring(0, 197) + "...")
     } else {
         bot.chat(oneLine)
@@ -317,6 +317,9 @@ function sendChat(text) {
 
 let blockedTicks = 0;
 let autoJumping = false;
+let failedJumpt = 0;
+let unsticking = false;
+let unstickAttemps = 0;
 
 function isSolid(block) {
     if (!block) {
@@ -330,14 +333,39 @@ function hasHeadroom() {
     return !isSolid(blockOverBot)
 }
 
+async function unstickSideways() {
+    if (unsticking) { 
+        return
+    }
+    unsticking = true;
+
+    try {
+    const direction = unstickAttemps % 2 === 0 ? "left" : "right"
+    unstickAttemps++
+
+    console.log(`Unstick: stepping ${direction}`)
+
+    bot.setControlState(direction, true)
+    bot.setControlState("jump", true)
+
+    await new Promise((resolve) => {
+        setTimeout(resolve, 300)
+    });
+
+    bot.setControlState(direction, false)
+    bot.setControlState("jump", false)
+} finally {
+    unsticking = false
+    }
+}
 bot.on("physicsTick", () => {
     if (!bot.entity) {
         return;
     }
 
-    if (!bot.pathfinder.isMoving() || bot.targetDigBlock) {
+    if (bot.targetDigBlock || bot.pathfinder.isMining() || bot.pathfinder.isBuilding()) {
         blockedTicks = 0;
-
+        failedJumpt = 0;
         if (autoJumping) {
             bot.setControlState("jump", false)
             autoJumping = false;
@@ -345,20 +373,46 @@ bot.on("physicsTick", () => {
         return
     }
 
+    const wantsToMove = bot.pathfinder.isMoving() || botBusy
+
+    if (!wantsToMove) {
+        blockedTicks = 0;
+        failedJumpt = 0;
+        if (autoJumping) {
+            bot.setControlState("jump", false)
+            autoJumping = false;
+        }
+        return
+    }
+
+    if (unsticking) {
+        return
+    }
+
     const velocity = bot.entity.velocity
     const speed = Math.sqrt(velocity.x * velocity.x + velocity.z * velocity.z)
 
-    if (bot.entity.onGround && speed < 0.03) {
+    if (bot.entity.onGround && speed < 0.05) {
         blockedTicks++
     } else {
         blockedTicks = 0
+        failedJumpt = 0
     }
 
-    if (blockedTicks >= 10 && hasHeadroom()) {
-        console.log("Auto jump");
-        bot.setControlState("jump", true);
-        autoJumping = true;
-        blockedTicks = 0;
+    if (blockedTicks >= 8) {
+        blockedTicks = 0
+
+        console.log(`Blocked: speed=${speed.toFixed(3)} isMoving=${bot.pathfinder.isMoving()} botBusy=${botBusy} headroom=${hasHeadroom()} failedJumps=${failedJumpt}`)
+
+        if (failedJumpt < 2 && hasHeadroom()) {
+            console.log("Auto jump");
+            bot.setControlState("jump", true);
+            autoJumping = true;
+            failedJumpt++;
+        } else {
+            failedJumpt = 0;
+            unstickSideways();
+        }
         return
     }
 
@@ -434,6 +488,7 @@ bot.once('spawn', () => {
     defaultMove.allowParkour = true;
     defaultMove.scafoldingBlocks.push(bot.registry.itemsByName['dirt'].id);
     defaultMove.allowSprinting = false;
+    bot.collectBlock.movements = defaultMove;
 });
 
 bot.on('end', (reason) => {
@@ -478,10 +533,7 @@ let lastPosition = null;
         let lastGatherPosition = null;
 
         while (collected < amount) {
-            const targetBlock = bot.findBlock({
-                matching: (block) => block.name === blockName,
-                maxDistance: 32
-            })
+            const targetBlock = findSafeBlocks(blockName)
 
             console.log("Bot position:", bot.entity.position)
             console.log("Target block found:", targetBlock ? targetBlock.position : 'none')
@@ -512,6 +564,29 @@ let lastPosition = null;
         return collected
     }
 
+
+function findSafeBlocks(blockName) {
+    const positions = bot.findBlocks({
+        matching: (block) => block.name === blockName,
+        maxDistance: 32,
+        count: 100
+    })
+
+    const botX = Math.floor(bot.entity.position.x)
+    const botY = Math.floor(bot.entity.position.y)
+    const botZ = Math.floor(bot.entity.position.z)
+
+    for (const position of positions) {
+        if (position.x === botX && position.z === botZ && position.y < botY) {
+            console.log("Skipping block under bot:", position)
+            continue
+        }
+
+        return bot.blockAt(position)
+    }
+
+    return null
+}
 
     const interpretation = await interpretCommand(message)
 
