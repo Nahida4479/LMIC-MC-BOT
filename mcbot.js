@@ -301,6 +301,20 @@ function stopFollowing() {
     followingPlayer = null
 }
 
+function sendChat(text) {
+    if (!text) {
+        return;
+    }
+
+    const oneLine = text.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
+
+    if (oneLine.lenght > 200) {
+        bot.chat(oneLine.substring(0, 197) + "...")
+    } else {
+        bot.chat(oneLine)
+    }
+}
+
 let blockedTicks = 0;
 let autoJumping = false;
 
@@ -557,9 +571,18 @@ let lastPosition = null;
         botBusy = false;
         return;
     }
-        const response = await askAI(message, username)
+
+
+    const chatPrompt = `You are a Minecraft bot named ${bot.username} talking on the in-game chat.
+    Answer in MAXIMUM 2 short sentences and under 200 characters in total.
+    Never use markdown, lists, numbering, headers or line breaks - this is a plain Minecraft chat.
+    Answer in the same language the player used.
+
+    Player message: "${message}"`
+
+        const response = await askAI(chatPrompt, username)
         if (response) {
-            bot.chat(response)
+            sendChat(response)
     }
 });
 }
