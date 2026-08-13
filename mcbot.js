@@ -332,6 +332,62 @@ async function digOut() {
     }
 }
 
+async function freeStuckBot(goal) {
+    bot.pathfinder.setGoal(null);
+
+    bot.setControlState("forward", false);
+    bot.setControlState("back", true);
+    await new Promise((resolve) => {
+        setTimeout((resolve) => {
+            
+        }, 400);
+    });
+
+    bot.setControlState("back", false)
+    bot.setControlState("jump", true)
+    await new Promise((resolve) => {
+        setTimeout((resolve) => {
+            
+        }, 300);
+    });
+
+    bot.setControlState("jump", false)
+
+    if (goal) {
+        bot.pathfinder.setGoal(goal)
+    }
+}
+
+setInterval(() => {
+    if (followingPlayer) {
+        return;
+    }
+
+    if (!bot.pathfinder.isMoving()) {
+        stuckCounter = 0;
+        return;
+    }
+
+    const currentPosition =bot.entity.position.clone();
+    console.log(currentPosition);
+
+    if (lastUniversalPosition && currentPosition.distanceTo(lastUniversalPosition) < 0.5) {
+        stuckCounter++
+    } else {
+        stuckCounter = 0;
+    }
+
+    lastUniversalPosition = currentPosition;
+
+    if (stuckCounter >= 0) {
+        console.log(`${date()} Bot looks stuck, trying to free it`)
+        stuckCounter = 0;
+        freeStuckBot(bot.pathfinder.goal)
+    }
+}, 2000);
+
+
+
 setInterval(() => {
     
     if (!followingPlayer) {
