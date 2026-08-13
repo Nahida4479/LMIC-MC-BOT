@@ -253,7 +253,7 @@ async function interpretCommand(message) {
     - "amount": the requested quantity (default 1 if not specified)
     
     If message is anything else, use "action": "chat".
-    Please answer in maximum 1-2 short sentences, this is a Minecraft chat with limited message length
+    Please answer in MAXIMUM 1-2 short sentences.
 
     Player message: "${message}"
     
@@ -301,6 +301,59 @@ function stopFollowing() {
     followingPlayer = null
 }
 
+let blockedTicks = 0;
+let autoJumping = false;
+
+function isSolid(block) {
+    if (!block) {
+        return false
+    }
+    return block.boundingBox === 'block'
+}
+
+function hasHeadroom() {
+    const blockOverBot = bot.blockAt(bot.entity.position.offset(0, 2, 0))
+    return !isSolid(blockOverBot)
+}
+
+bot.on("physicsTick", () => {
+    if (!bot.entity) {
+        return;
+    }
+
+    if (!bot.pathfinder.isMoving() || bot.targetDigBlock) {
+        blockedTicks = 0;
+
+        if (autoJumping) {
+            bot.setControlState("jump", false)
+            autoJumping = false;
+        }
+        return
+    }
+
+    const velocity = bot.entity.velocity
+    const speed = Math.sqrt(velocity.x * velocity.x + velocity.z * velocity.z)
+
+    if (bot.entity.onGround && speed < 0.03) {
+        blockedTicks++
+    } else {
+        blockedTicks = 0
+    }
+
+    if (blockedTicks >= 10 && hasHeadroom()) {
+        console.log("Auto jump");
+        bot.setControlState("jump", true);
+        autoJumping = true;
+        blockedTicks = 0;
+        return
+    }
+
+    if (autoJumping && bot.entity.onGround) {
+        bot.setControlState("jump", false);
+        autoJumping = false;
+    }
+})
+
 async function goToPlayer(target) {
     const p = target.position
     bot.pathfinder.setMovements(defaultMove);
@@ -332,61 +385,6 @@ async function digOut() {
     }
 }
 
-async function freeStuckBot(goal) {
-    bot.pathfinder.setGoal(null);
-
-    bot.setControlState("forward", false);
-    bot.setControlState("back", true);
-    await new Promise((resolve) => {
-        setTimeout((resolve) => {
-            
-        }, 400);
-    });
-
-    bot.setControlState("back", false)
-    bot.setControlState("jump", true)
-    await new Promise((resolve) => {
-        setTimeout((resolve) => {
-            
-        }, 300);
-    });
-
-    bot.setControlState("jump", false)
-
-    if (goal) {
-        bot.pathfinder.setGoal(goal)
-    }
-}
-
-setInterval(() => {
-    if (followingPlayer) {
-        return;
-    }
-
-    if (!bot.pathfinder.isMoving()) {
-        stuckCounter = 0;
-        return;
-    }
-
-    const currentPosition =bot.entity.position.clone();
-    console.log(currentPosition);
-
-    if (lastUniversalPosition && currentPosition.distanceTo(lastUniversalPosition) < 0.5) {
-        stuckCounter++
-    } else {
-        stuckCounter = 0;
-    }
-
-    lastUniversalPosition = currentPosition;
-
-    if (stuckCounter >= 0) {
-        console.log(`${date()} Bot looks stuck, trying to free it`)
-        stuckCounter = 0;
-        freeStuckBot(bot.pathfinder.goal)
-    }
-}, 2000);
-
-
 
 setInterval(() => {
     
@@ -404,7 +402,7 @@ setInterval(() => {
 
     const distanse = bot.entity.position.distanceTo(player.entity.position)
 
-    if (distanse > 10) {
+    if (distanse > 3) {
         const p = player.entity.position;
         bot.pathfinder.setMovements(defaultMove)
         bot.pathfinder.setGoal(new GoalNear(p.x, p.y, p.z, 5))
@@ -412,7 +410,7 @@ setInterval(() => {
 
         lastPosition = bot.entity.position.clone();
     }
-}, 8000)
+}, 4000)
 
 bot.once('spawn', () => {
     console.log(`[${date()}] ${bot.username} active`);
@@ -421,9 +419,7 @@ bot.once('spawn', () => {
     defaultMove.canDig = true;
     defaultMove.allowParkour = true;
     defaultMove.scafoldingBlocks.push(bot.registry.itemsByName['dirt'].id);
-    bot.setControlState("forward", true)
-    bot.setControlState("sprint", true)
-    bot.setControlState("jump", true)
+    defaultMove.allowSprinting = false;
 });
 
 bot.on('end', (reason) => {
@@ -537,6 +533,7 @@ let lastPosition = null;
         botBusy = false
         return
     }
+
 
 
     if (message.toLowerCase().includes('fight me')  ) {
