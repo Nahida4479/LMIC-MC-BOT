@@ -363,7 +363,9 @@ bot.on("physicsTick", () => {
         return;
     }
 
-    if (bot.targetDigBlock || bot.pathfinder.isMining() || bot.pathfinder.isBuilding()) {
+    const recentlyDug = bot.lastDigTime &&  (performance.now() - bot.lastDigTime < 1500)
+
+    if (bot.targetDigBlock || bot.pathfinder.isMining() || bot.pathfinder.isBuilding() || recentlyDug) {
         blockedTicks = 0;
         failedJumpt = 0;
         if (autoJumping) {
@@ -547,6 +549,7 @@ let lastPosition = null;
             }
 
 
+            console.log("Digging:", targetBlock.name, "| holding:", bot.heldItem ? bot.heldItem.name : "none")
             try {
             await Promise.race([
                 bot.collectBlock.collect(targetBlock),
@@ -554,6 +557,7 @@ let lastPosition = null;
             ]) 
             collected++
             console.log("Successfully collected! Total:", collected)
+            console.log("Block now:", bot.blockAt(targetBlock.position).name)
             console.log("Bot inventory:", bot.inventory.items().map(item => item.name + " x" + item.count))
 
             } catch (err) {
