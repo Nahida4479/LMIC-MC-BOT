@@ -80,9 +80,10 @@ Since I don't have a stable 24/7 hosting, you can run the Minecraft server local
 
 ## .env example
 
-```BOT_NAME=LMIC-MC-BOT
+```
+BOT_NAME=LMIC-MC-BOT
 SERVER=192.168.1.108
-SERVER_PORT=25565               
+SERVER_PORT=25565 # Default 25565              
 
 GEMINI_FREE_API=
 GROQ_FREE_API=
