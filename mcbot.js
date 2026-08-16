@@ -375,7 +375,7 @@ bot.on("physicsTick", () => {
         return
     }
 
-    const wantsToMove = bot.pathfinder.isMoving() || botBusy
+    const wantsToMove = bot.pathfinder.isMoving()
 
     if (!wantsToMove) {
         blockedTicks = 0;
@@ -398,7 +398,9 @@ bot.on("physicsTick", () => {
         blockedTicks++
     } else {
         blockedTicks = 0
+        if (speed >= 0.05) {
         failedJumpt = 0
+        }
     }
 
     if (blockedTicks >= 8) {
@@ -456,12 +458,16 @@ async function digOut() {
 }
 
 
-setInterval(() => {
+const followInternal = setInterval(() => {
     
     if (!followingPlayer) {
         return
     }
     if (botBusy) {
+        return
+    }
+
+    if (!bot.entity || bot.players) {
         return
     }
 
@@ -494,6 +500,7 @@ bot.once('spawn', () => {
 });
 
 bot.on('end', (reason) => {
+    clearInterval(followInternal)   
     console.log(`[${date()}] ${bot.username} disconnected (${reason}). Reconnecting...` )
     if (!reconnecting) {
         reconnecting = true;
@@ -533,9 +540,10 @@ let lastPosition = null;
     async function gatherBlocks(blockName, amount) {
         let collected = 0;
         let lastGatherPosition = null;
+        const startY = Math.floor(bot.entity.position.y)
 
         while (collected < amount) {
-            const targetBlock = findSafeBlocks(blockName)
+            const targetBlock = findSafeBlocks(blockName, startY)
 
             console.log("Bot position:", bot.entity.position)
             console.log("Target block found:", targetBlock ? targetBlock.position : 'none')
@@ -569,7 +577,7 @@ let lastPosition = null;
     }
 
 
-function findSafeBlocks(blockName) {
+function findSafeBlocks(blockName, startY) {
     const positions = bot.findBlocks({
         matching: (block) => block.name === blockName,
         maxDistance: 32,
@@ -581,6 +589,11 @@ function findSafeBlocks(blockName) {
     const botZ = Math.floor(bot.entity.position.z)
 
     for (const position of positions) {
+
+        if (position.y < startY - 1) {
+            continue
+        }
+        
         if (position.x === botX && position.z === botZ && position.y < botY) {
             console.log("Skipping block under bot:", position)
             continue
