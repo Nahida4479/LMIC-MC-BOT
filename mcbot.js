@@ -6,6 +6,8 @@ const { GoalNear } = require('mineflayer-pathfinder').goals;
 const collectBlock = require('mineflayer-collectblock').plugin
 const translations = require('./languages/languages');
 const languages = require('./languages/languages');
+const mcmobs = require('./mc_mobs');
+const hostileMobs = mcmobs.hostileMobs
 require('dotenv').config();
 
 function date() {
@@ -245,6 +247,8 @@ async function interpretCommand(message) {
     const prompt = `You are a Minecraft bot command interpreter. Analyze the pleyer,s message and respond ONLY with JSON in this exact format:
     {"action": "collect", "block": "<minecraft_block_name>", "amount": <number>, "language": "<pl_or_en>"}
     or
+    {"action": "attack", "target": "<mob_name_or_player_username>", "language": "<pl_or_en>"}
+    or
     {"action": "chat", "block": null, "amount": null, "language": "<pl_or_en>"}
 
     Use "pl" for language if the player wrote in Polish, otherwise use "en". 
@@ -252,6 +256,10 @@ async function interpretCommand(message) {
     - "block": the Minecraft official block name in English, lowercase, using underscores (e.g. "oak_log", "diamont_ore", "iron_ore", "cobblestone", grass_block)
     - "amount": the requested quantity (default 1 if not specified)
     
+    If the message asks to attack, kill, or fight a mob or player, use "attack" with:
+    - "target": the exact player username if attacking a player, OR the minecraft mob name in English lowercase with underscores if attacking a mob (e.g. "zombie", "skeleton", "spider", "creeper", "ghast", "enderman", "shulker", "ender_dragon", "pillager", "blaze", "breeze", "cow", "piglin", "sheep")
+
+
     If message is anything else, use "action": "chat".
     Please answer in MAXIMUM 1-2 short sentences.
 
@@ -471,6 +479,21 @@ const followInternal = setInterval(() => {
         return
     }
 
+    const nearbyHostile = bot.nearestEntity((entity) => {
+        if (!hostileMobs.includes(entity.name)) {
+            return false;
+        }
+        return bot.entity.position.distanceTo(entity.position) <= 8
+    })
+
+    if (nearbyHostile) {
+        botBusy = true
+        bot.pvp.movements = defaultMove;
+        bot.pvp.followRange = 2;
+        bot.pvp.attack(nearbyHostile)
+        return
+    }
+
     const player = bot.players[followingPlayer]
     if (!player || !player.entity) {
         return
@@ -523,6 +546,10 @@ bot.on('error', (err) => {
         setTimeout(createBot, 2000);
     }
 });
+
+bot.on('stoppedAttacking', () => {
+    botBusy = false
+})
 
 bot.on('chat', async (username, message) => {
     if (username === bot.username) return
@@ -641,6 +668,33 @@ function findSafeBlocks(blockName, startY) {
     }
 
 
+    if (interpretCommand === 'attack') {
+        if (botBusy) {
+            bot.chat(translations.getMessage(interpretation.language, "busy"))
+            return
+        }
+
+        let targetEntity = null;
+        const targetPlayer = bot.players[interpretation.target]
+        
+        if (targetPlayer && targetPlayer.entity) {
+            targetEntity = targetPlayer.entity
+        } else {
+            targetEntity = bot.nearestEntity((entity) => entity.name === interpretation.target)
+        }
+
+        if (!targetEntity) {
+            const dontseeyou = translations.getMessage(interpretation.language, "dontSeeYou")
+            bot.chat(dontseeyou)
+            return
+        }
+
+        botBusy = true
+        bot.pvp.movements = defaultMove
+        bot.pvp.followRange = 2
+        bot.pvp.attack(targetEntity)
+        return
+    }
 
     if (message.toLowerCase().includes('fight me')  ) {
         const player = bot.players[username];
