@@ -23,6 +23,7 @@ let botBusy = false;
 let followingPlayer = null;
 let lastUniversalPosition;
 let stuckCounter = 0;
+let reconnectDelay = 5000;
 
 function addToHistory(username, role, content) {
     if (!conversationHistory[username]) {
@@ -333,6 +334,7 @@ let unstickAttemps = 0;
 let watchdogLastPosition = null;
 let watchdogStuckStreak= 0;
 let watchdogRecoveryAttempts = 0;
+let watchdogCooldownUntil = 0;
 
 function isSolid(block) {
     if (!block) {
@@ -400,7 +402,16 @@ function getBlockingBlocks() {
 
 }
 
-async function forceUnstuck() {
+async function forceUnstuck() { 
+
+    if (hasHeadroom()) {
+        bot.setControlState("jump", true);
+        await new Promise((resolve) => setTimeout(resolve, 300));
+        bot.setControlState("jump", false)
+        await unstickSideways();
+        return;
+    }
+
     const blockers = getBlockingBlocks();
     let dugAny = false;
 
@@ -431,6 +442,16 @@ async function forceUnstuck() {
     }
 
 }
+
+ async function equipWeapon() {
+        const weapon = bot.inventory.items().find((item) => {
+            return item.name.includes('sword')
+        })
+
+        if (weapon) {
+            await bot.equip(weapon, 'hand')
+        }
+    }
 
 bot.on("physicsTick", () => {
     if (!bot.entity) {
@@ -503,6 +524,8 @@ bot.on("physicsTick", () => {
 const stuckWatchdogInterval = setInterval(async () => {
     if (!bot.entity) return;
 
+    if (Date.now() < watchdogCooldownUntil) return;
+
     const hasGoal = bot.pathfinder && bot.pathfinder.goal;
     const isPvpActive = bot.pvp && bot.pvp.target;
     const shouldBeActive = botBusy || followingPlayer || hasGoal || isPvpActive;
@@ -550,6 +573,7 @@ const stuckWatchdogInterval = setInterval(async () => {
         if (bot.pvp) bot.pvp.stop();
         botBusy = false;
         watchdogRecoveryAttempts = 0;
+        watchdogCooldownUntil = Date.now() + 10000;
         return;
     }
 
@@ -597,6 +621,10 @@ const followInternal = setInterval(async () => {
         return
     }
 
+    if (Date.now() <  watchdogCooldownUntil) {
+        return
+    }
+
     if (!bot.entity || !bot.players) {
         return
     }
@@ -610,6 +638,7 @@ const followInternal = setInterval(async () => {
 
     if (nearbyHostile) {
         botBusy = true
+        await equipWeapon();
         bot.pvp.movements = defaultMove;
         bot.pvp.followRange = 2;
         bot.pvp.attack(nearbyHostile)
@@ -631,10 +660,11 @@ const followInternal = setInterval(async () => {
 
         lastPosition = bot.entity.position.clone();
     }
-}, 4000)
+}, 2000)
 
 bot.once('spawn', () => {
     console.log(`[${date()}] ${bot.username} active`);
+    reconnectDelay = 5000;
     defaultMove = new Movements(bot);
     console.log("collectBlock type:", typeof bot.collectBlock);
     defaultMove.canDig = true;
@@ -650,17 +680,20 @@ bot.on('end', (reason) => {
     console.log(`[${date()}] ${bot.username} disconnected (${reason}). Reconnecting...` )
     if (!reconnecting) {
         reconnecting = true;
-        setTimeout(createBot, 2000)
+        setTimeout(createBot, reconnectDelay)
+        reconnectDelay = Math.min(reconnectDelay * 2, 60000);
+
     }
 });
 
 bot.on('kicked', (reason) => {
     clearInterval(followInternal)  
     clearInterval(stuckWatchdogInterval) 
-    console.log(`[${date()}] ${bot.username} kicked (${reason})`)
+    console.log(`[${date()}] ${bot.username} kicked (${JSON.stringify(reason)})`)
     if (!reconnecting) {
         reconnecting = true;
-        setTimeout(createBot, 2000);
+        setTimeout(createBot, reconnectDelay);
+        reconnectDelay = Math.min(reconnectDelay * 2, 60000);
     }
 });
 
@@ -670,7 +703,8 @@ bot.on('error', (err) => {
     console.log(`[${date()}] Error: ${err.message}`)
     if (!reconnecting) {
         reconnecting = true;
-        setTimeout(createBot, 2000);
+        setTimeout(createBot, reconnectDelay);
+        reconnectDelay = Math.min(reconnectDelay * 2, 60000);
     }
 });
 
@@ -794,17 +828,6 @@ function findSafeBlocks(blockName, startY) {
         botBusy = false
         return
     }
-
-    async function equipWeapon() {
-        const weapon = bot.inventory.items().find((item) => {
-            item.name.includes('sword')
-        })
-
-        if (weapon) {
-            await bot.equip(weapon, 'hand')
-        }
-    }
-
 
     if (interpretCommand === 'attack') {
         if (botBusy) {
