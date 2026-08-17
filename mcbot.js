@@ -390,13 +390,45 @@ function getBlockingBlocks() {
             return false;
         }
 
-        const key = `${block.position.x},${block.position.y},${block.position.y}`;
+        const key = `${block.position.x},${block.position.y},${block.position.z}`;
         if (seen.has(key)) {
             return false;
         }
         seen.add(key);
         return true;
     })
+
+}
+
+async function forceUnstuck() {
+    const blockers = getBlockingBlocks();
+    let dugAny = false;
+
+    for (const block of blockers) {
+        if (isSolid(block) && bot.canDigBlock(block)) {
+            try {
+            await bot.dig(block)
+            dugAny = true;
+            } catch (err) {
+                console.log(err.message)
+            }
+    }
+}
+
+
+    if (!dugAny) {
+        bot.setControlState("jump", true);
+        await new Promise((resolve) => setTimeout(resolve, 300));
+        bot.setControlState("jump", false);
+        await unstickSideways();
+    }
+
+    if (bot.pathfinder && bot.pathfinder.goal) {
+        const goal= bot.pathfinder.goal;
+        bot.pathfinder.setGoal(null);
+        await new Promise((resolve) => setTimeout(resolve, 150));
+        bot.pathfinder.setGoal(goal);
+    }
 
 }
 
@@ -468,6 +500,62 @@ bot.on("physicsTick", () => {
     }
 })
 
+const stuckWatchdogInterval = setInterval(async () => {
+    if (!bot.entity) return;
+
+    const hasGoal = bot.pathfinder && bot.pathfinder.goal;
+    const isPvpActive = bot.pvp && bot.pvp.target;
+    const shouldBeActive = botBusy || followingPlayer || hasGoal || isPvpActive;
+
+    if (!shouldBeActive) {
+        watchdogLastPosition = null;
+        watchdogStuckStreak = 0;
+        watchdogRecoveryAttempts = 0;
+        return;
+    }
+
+    const recentlyDug = bot.lastDigTime && (performance.now() - bot.lastDigTime < 2500);
+    if (bot.targetDigBlock || recentlyDug || unsticking) {
+        watchdogLastPosition = bot.entity.position.clone();
+        return;
+    }
+
+    if (!watchdogLastPosition) {
+        watchdogLastPosition = bot.entity.position.clone();
+        return;
+    }
+
+    const moved = bot.entity.position.distanceTo(watchdogLastPosition);
+    watchdogLastPosition = bot.entity.position.clone();
+
+    if (moved >= 0.4) {
+        watchdogStuckStreak = 0;
+        watchdogRecoveryAttempts = 0;
+        return;
+    }
+
+    watchdogStuckStreak++;
+    console.log(`${date()} Watchdog: ${watchdogStuckStreak}, moved=${moved.toFixed(2)}`);
+
+    if (watchdogStuckStreak < 2) {
+        return;
+    }
+
+    watchdogStuckStreak = 0;
+    watchdogRecoveryAttempts++;
+
+    if (watchdogRecoveryAttempts > 4) {
+        console.log(`${date()} Watchdog: too many recovery attempts`)
+        if (bot.pathfinder) bot.pathfinder.setGoal(null);
+        if (bot.pvp) bot.pvp.stop();
+        botBusy = false;
+        watchdogRecoveryAttempts = 0;
+        return;
+    }
+
+    await forceUnstuck();
+}, 2500)  
+
 async function goToPlayer(target) {
     const p = target.position
     bot.pathfinder.setMovements(defaultMove);
@@ -535,10 +623,10 @@ const followInternal = setInterval(async () => {
 
     const distanse = bot.entity.position.distanceTo(player.entity.position)
 
-    if (distanse > 3) {
+    if (distanse > 5) {
         const p = player.entity.position;
         bot.pathfinder.setMovements(defaultMove)
-        bot.pathfinder.setGoal(new GoalNear(p.x, p.y, p.z, 5))
+        bot.pathfinder.setGoal(new GoalNear(p.x, p.y, p.z, 3))
 
 
         lastPosition = bot.entity.position.clone();
@@ -557,7 +645,8 @@ bot.once('spawn', () => {
 });
 
 bot.on('end', (reason) => {
-    clearInterval(followInternal)   
+    clearInterval(followInternal)  
+    clearInterval(stuckWatchdogInterval) 
     console.log(`[${date()}] ${bot.username} disconnected (${reason}). Reconnecting...` )
     if (!reconnecting) {
         reconnecting = true;
@@ -566,6 +655,8 @@ bot.on('end', (reason) => {
 });
 
 bot.on('kicked', (reason) => {
+    clearInterval(followInternal)  
+    clearInterval(stuckWatchdogInterval) 
     console.log(`[${date()}] ${bot.username} kicked (${reason})`)
     if (!reconnecting) {
         reconnecting = true;
@@ -574,6 +665,8 @@ bot.on('kicked', (reason) => {
 });
 
 bot.on('error', (err) => {
+    clearInterval(followInternal)  
+    clearInterval(stuckWatchdogInterval) 
     console.log(`[${date()}] Error: ${err.message}`)
     if (!reconnecting) {
         reconnecting = true;
