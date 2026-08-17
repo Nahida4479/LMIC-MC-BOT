@@ -247,7 +247,7 @@ async function interpretCommand(message) {
     const prompt = `You are a Minecraft bot command interpreter. Analyze the pleyer,s message and respond ONLY with JSON in this exact format:
     {"action": "collect", "block": "<minecraft_block_name>", "amount": <number>, "language": "<pl_or_en>"}
     or
-    {"action": "attack", "target": "<mob_name_or_player_username>", "language": "<pl_or_en>"}
+    {"action": "attack", "target": "<mob_name_or_player_username>", "amount": <number>, "language": "<pl_or_en>"}
     or
     {"action": "chat", "block": null, "amount": null, "language": "<pl_or_en>"}
 
@@ -259,6 +259,7 @@ async function interpretCommand(message) {
     If the message asks to attack, kill, or fight a mob or player, use "attack" with:
     - "target": the exact player username if attacking a player, OR the minecraft mob name in English lowercase with underscores if attacking a mob (e.g. "zombie", "skeleton", "spider", "creeper", "ghast", "enderman", "shulker", "ender_dragon", "pillager", "blaze", "breeze", "cow", "piglin", "sheep")
 
+    If attacking mobs, "amount" is how many to kill (default 1 if not specified). If attacking a player, "amount" should always be 1.
 
     If message is anything else, use "action": "chat".
     Please answer in MAXIMUM 1-2 short sentences.
@@ -466,7 +467,7 @@ async function digOut() {
 }
 
 
-const followInternal = setInterval(() => {
+const followInternal = setInterval(async () => {
     
     if (!followingPlayer) {
         return
@@ -475,7 +476,7 @@ const followInternal = setInterval(() => {
         return
     }
 
-    if (!bot.entity || bot.players) {
+    if (!bot.entity || !bot.players) {
         return
     }
 
@@ -667,6 +668,16 @@ function findSafeBlocks(blockName, startY) {
         return
     }
 
+    async function equipWeapon() {
+        const weapon = bot.inventory.items().find((item) => {
+            item.name.includes('sword')
+        })
+
+        if (weapon) {
+            await bot.equip(weapon, 'hand')
+        }
+    }
+
 
     if (interpretCommand === 'attack') {
         if (botBusy) {
@@ -674,25 +685,41 @@ function findSafeBlocks(blockName, startY) {
             return
         }
 
-        let targetEntity = null;
-        const targetPlayer = bot.players[interpretation.target]
-        
-        if (targetPlayer && targetPlayer.entity) {
-            targetEntity = targetPlayer.entity
-        } else {
-            targetEntity = bot.nearestEntity((entity) => entity.name === interpretation.target)
+        botBusy = true;
+        let killed = 0;
+        const amount = interpretation.amount || 1;
+
+        while (killed < amount) {
+            let targetEntity = null
+            const targetPlayer = bot.players[interpretation.target]
+
+            if (targetPlayer && targetPlayer.entity) {
+                targetEntity = targetPlayer.entity
+            } else {
+                targetEntity = bot.nearestEntity((entity) => entity.name === interpretation.target)
         }
 
-        if (!targetEntity) {
-            const dontseeyou = translations.getMessage(interpretation.language, "dontSeeYou")
-            bot.chat(dontseeyou)
-            return
+            if (!targetEntity) {
+                break
+            }
+
+            await equipWeapon();
+            bot.pvp.movements = defaultMove
+            bot.pvp.followRange = 2
+            bot.pvp.attack(targetEntity)
+
+            await new Promise((resolve) => {
+                bot.once('stoppedAttacking', resolve)
+            })
+            killed = killed + 1
         }
 
-        botBusy = true
-        bot.pvp.movements = defaultMove
-        bot.pvp.followRange = 2
-        bot.pvp.attack(targetEntity)
+        botBusy = false
+
+        if (killed < amount) {
+            const text = translations.getMessage(interpretation.language, "foundOnly")
+            bot.chat(`${text} ${killed}x ${interpretation.target}`)
+        }
         return
     }
 
