@@ -82,7 +82,7 @@ async function askAI(prompt, username) {
 
 // Test AI Model
 const geminiModels = ['gemini-2.5-flash', 'gemini-2.5-flash-lite']
-const groqModels = ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant', "openai/gpt-oss-120b", "openai/gpt-oss-20b", "qwen/qwen3.6-27b"   ]
+const groqModels = ["openai/gpt-oss-120b", "openai/gpt-oss-20b", "qwen/qwen3.6-27b"]
 const HackClubModels = ['meta-llama/llama-3.3-70b-instruct']
 
 async function testHackClub(model) {
@@ -253,7 +253,7 @@ async function interpretCommand(message) {
 
     Use "pl" for language if the player wrote in Polish, otherwise use "en". 
     If the message asks the collect/gather/mine any resource, use "collect" with:
-    - "block": the Minecraft official block name in English, lowercase, using underscores (e.g. "oak_log", "diamont_ore", "iron_ore", "cobblestone", grass_block)
+    - "block": the Minecraft official block name in English, lowercase, using underscores (e.g. "oak_log", "diamont_ore", "iron_ore", "cobblestone", grass_block, stone_block, deepslate)
     - "amount": the requested quantity (default 1 if not specified)
     
     If the message asks to attack, kill, or fight a mob or player, use "attack" with:
@@ -279,6 +279,7 @@ async function interpretCommand(message) {
     }
 
 }
+
 
 function timeout(ms) {
     return new Promise((resolve, reject) => {
@@ -329,6 +330,9 @@ let autoJumping = false;
 let failedJumpt = 0;
 let unsticking = false;
 let unstickAttemps = 0;
+let watchdogLastPosition = null;
+let watchdogStuckStreak= 0;
+let watchdogRecoveryAttempts = 0;
 
 function isSolid(block) {
     if (!block) {
@@ -367,6 +371,35 @@ async function unstickSideways() {
     unsticking = false
     }
 }
+
+function getBlockingBlocks() {
+    const block = [];
+    const cursorBlock = bot.blockAtCursor(3);
+    if (cursorBlock) block.push(cursorBlock);
+
+    const yaw = bot.entity.yaw;
+    const dx = -Math.sin(yaw);
+    const dz = -Math.cos(yaw);
+    const frontPos = bot.entity.position.offset(dx, 0, dz)
+    block.push(bot.blockAt(frontPos));
+    block.push(bot.blockAt(frontPos.offset(0, 1, 0)));
+
+    const seen = new Set();
+    return block.filter((block) => {
+        if (!block) {
+            return false;
+        }
+
+        const key = `${block.position.x},${block.position.y},${block.position.y}`;
+        if (seen.has(key)) {
+            return false;
+        }
+        seen.add(key);
+        return true;
+    })
+
+}
+
 bot.on("physicsTick", () => {
     if (!bot.entity) {
         return;
@@ -634,6 +667,7 @@ function findSafeBlocks(blockName, startY) {
 }
 
     const interpretation = await interpretCommand(message)
+    console.log("AI intepretation:", interpretation)
 
     if (interpretation.action === 'collect') {
         if (botBusy) {
