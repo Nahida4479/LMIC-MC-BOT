@@ -829,7 +829,7 @@ function findSafeBlocks(blockName, startY) {
         return
     }
 
-    if (interpretCommand === 'attack') {
+    if (interpretation.action === 'attack') {
         if (botBusy) {
             bot.chat(translations.getMessage(interpretation.language, "busy"))
             return
