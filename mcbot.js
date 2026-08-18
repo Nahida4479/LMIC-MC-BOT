@@ -263,9 +263,8 @@ async function interpretCommand(message) {
     - "target": the exact player username if attacking a player, OR the minecraft mob name in English lowercase with underscores if attacking a mob (e.g. "zombie", "skeleton", "spider", "creeper", "ghast", "enderman", "shulker", "ender_dragon", "pillager", "blaze", "breeze", "cow", "piglin", "sheep")
 
     If attacking mobs, "amount" is how many to kill (default 1 if not specified). If attacking a player, "amount" should always be 1.
-
     If the message asks the bot to give, hand over, drop, or toss an item to the player (e.g. in any language "give me", "daj mi", "can I have"), use "give" with:
-    - "item": the Minecraft official item name in English, lowercase, using underscores - prefer an item that actually appears in the bot's inventory listed above
+    - "item": copy the EXACT item name as it literally appears in the bot's inventory listed above. Do not guess a different material or variant. If the player asked generically (e.g. "sword" without specifying material) and the bot's inventory contains a matching item type, use that exact inventory name (e.g. inventory has "netherite_sword" -> use "netherite_sword", not "diamond_sword"). If nothing in the bot's inventory matches what was asked, set "item" to null.
     - "amount": the requested quantity (default 1 if not specified)
 
     If message is anything else, use "action": "chat".
@@ -970,6 +969,17 @@ function findSafeBlocks(blockName, startY) {
             await goToPlayer(target)
         }
 
+        if (collected > 0) {
+            try {
+                const collectedItemStack = bot.inventory.items().find((item) => item.name === interpretation.block);
+                if (collectedItemStack) {
+                    await bot.toss(collectedItemStack.type, null, Math.min(collected, collectedItemStack.count));
+                }
+            } catch (err) {
+                console.log(`Failed to give collected items: ${err.message}`)
+            }
+        }
+
         if (collected < interpretation.amount) {
             const text = translations.getMessage(interpretation.language, "foundOnly")
             bot.chat(`${text} ${collected}/${interpretation.amount} ${interpretation.block}`)
@@ -1089,6 +1099,8 @@ function findSafeBlocks(blockName, startY) {
     Answer in MAXIMUM 2 short sentences and under 200 characters in total.
     Never use markdown, lists, numbering, headers or line breaks - this is a plain Minecraft chat.
     Answer in the same language the player used.
+
+    Current ${bot.username} situation: ${getBotContextSummary()} 
 
     Player message: "${message}"`
 
