@@ -244,7 +244,7 @@ async function askGemini(messages) {
     }
 }
 
-async function interpretCommand(message) {
+async function interpretCommand(message, contextSummary) {
     const prompt = `You are a Minecraft bot command interpreter. Analyze the pleyer,s message and respond ONLY with JSON in this exact format:
     {"action": "collect", "block": "<minecraft_block_name>", "amount": <number>, "language": "<pl_or_en>"}
     or
@@ -876,7 +876,9 @@ let lastPosition = null;
 
     async function gatherBlocks(blockName, amount) {
         let collected = 0;
+        let failure = 0;
         let lastGatherPosition = null;
+
         const startY = Math.floor(bot.entity.position.y)
 
         while (collected < amount) {
@@ -903,13 +905,20 @@ let lastPosition = null;
                 timeout(60000)
             ]) 
             collected++
+            failure = 0;
             console.log("Successfully collected! Total:", collected)
             console.log("Block now:", bot.blockAt(targetBlock.position).name)
             console.log("Bot inventory:", bot.inventory.items().map(item => item.name + " x" + item.count))
 
             } catch (err) {
                 console.log(`Failed to collect: ${err.message}`)
-                return collected
+                failure++
+
+                if (failure >= 3) {
+                    console.log(failure)
+                    return collected
+
+                }
             }
         }
         return collected
