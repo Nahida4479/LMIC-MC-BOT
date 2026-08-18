@@ -545,7 +545,21 @@ async function handleHostileThreat() {
         return true;
     }
 
+function getBotContextSummary() {
+    const inventory = bot.inventory.items().length > 0 ? bot.inventory.items().map((item) => `${item.name} x${item.count}`).join(', ') : 'empty';
 
+    const underBot = bot.blockAt(bot.entity.position.offset(0 , -1, 0));
+    const lookingAt = bot.blockAtCursor(4);
+
+    const nearbyEntities = Object.values(bot.entities)
+        .filter((entity) => entity !== bot.entity && bot.entity.position.distanceTo(entity.position) <= 10)
+        .map((entity) => entity.name || entity.username)
+        .filter(Boolean)
+        .slice(0, 8)
+        .join(', ') || 'none';
+
+        return `Bot inventory: ${inventory}. Standing on: ${underBot ? underBot.name : 'unknown'}. Looking at: ${lookingAt ? lookingAt.name : 'nothing in range'}. ${nearbyEntities}`;
+}
 
 async function equipBestArmor() {
     const bestPerSlot = {};
