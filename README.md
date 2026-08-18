@@ -102,8 +102,8 @@ Since I don't have a stable 24/7 hosting, you can run the Minecraft server local
 git clone https://github.com/Nahida4479/LMIN-MC-BOT.git
 cd LMIC-MC-BOT
 npm install
-
 ```
+
 Create a .env file in the project folder:
 ```
 BOT_NAME=LMIC-MC-BOT
@@ -134,17 +134,12 @@ node mcbot.js
 ## The bot can
 - Kills nearby monsters (protects the player from them)
 
-![monster](./docs/docs_image/monster.mp4)
-
 - Follows the player and breaks blocks
 
 - Delivers gathered resources directly to the player who requested them
 
-![give_items](./docs/docs_image/dirt.mp4)
-
 - Auto-equips the best armor set available whenever it picks up new gear
 
-![equip_armor](./docs/docs_image/armor.mp4)
 
 ## Example commands
 
