@@ -374,6 +374,14 @@ async function unstickSideways() {
     }
 }
 
+function getBlockingPlayerEntity() {
+    return bot.nearestEntity((entity) => {
+        if (entity.type !== 'player') return false;
+        if (entity.username === bot.username) return false;
+        return bot.entity.position.distanceTo(entity.position) < 1.2;
+    })
+}
+
 function getBlockingBlocks() {
     const block = [];
     const cursorBlock = bot.blockAtCursor(3);
@@ -403,6 +411,13 @@ function getBlockingBlocks() {
 }
 
 async function forceUnstuck() { 
+
+    const blockingPlayer = getBlockingPlayerEntity();
+    if (blockingPlayer) {
+        console.log(`Watchdog: the player ${blockingPlayer.username} blocks bot`)
+        await unstickSideways();
+        return;
+    }
 
     if (hasHeadroom()) {
         bot.setControlState("jump", true);
@@ -441,6 +456,63 @@ async function forceUnstuck() {
         bot.pathfinder.setGoal(goal);
     }
 
+}
+
+const armorTiers = {
+    leather: 1,
+    golden: 2,
+    chainmail: 3,
+    turtle: 3,
+    iron: 4,
+    diamond: 5,
+    netherite: 6
+}
+
+function getArmorTier(itemName) {
+    for (const material of armorTiers) {
+        if (itemName.startsWith(material)) {
+            return armorTiers[material]
+        }
+    }
+    return 0;
+}
+
+function getArmorSlot(itemName) {
+    if (itemName.endsWith('_helmet') || itemName === 'turtle_helmet') return { dest: 'head', index: 5};
+    if (itemName.endsWith('_chestplate')) return { dest: 'torso', index: 6 };
+    if (itemName.endsWith('_leggings')) return { dest: 'legs', index: 7 };
+    if (itemName.endsWith('_boots')) return { dest: 'feet', index: 8 };
+    return null;
+}
+
+async function equipBestArmor() {
+    const bestPerSlot = {};
+
+    for (const item of bot.inventory.items()) {
+        const slot = getArmorSlot(item.name);
+        if (!slot) continue;
+
+        const current = bestPerSlot[slot.dest];
+        if (!current || getArmorTier(item.name) > getArmorTier(current.name)) {
+            bestPerSlot[slot.dest] = item;
+        }
+    }
+
+    for (const dest in bestPerSlot) {
+        const candidate = bestPerSlot[dest];
+        const slotInfo = getArmorSlot(candidate.name)
+        const worn = bot.inventory.slots[slotInfo.index];
+
+        if (!worn || getArmorTier(candidate.name) > getArmorTier(worn.name)) {
+            try {
+                await bot.equip(candidate, dest);
+                console.log(`New armor: ${candidate.name}`);
+
+            } catch (err) {
+                console.log(err.message)
+            }
+        }
+    }
 }
 
  async function equipWeapon() {
@@ -707,6 +779,11 @@ bot.on('error', (err) => {
         reconnectDelay = Math.min(reconnectDelay * 2, 60000);
     }
 });
+
+bot.on('playerCollect', (collector, collected) => {
+    if (collector !== bot.entity) return;
+    setTimeout(equipBestArmor, 150);
+})
 
 bot.on('stoppedAttacking', () => {
     botBusy = false
