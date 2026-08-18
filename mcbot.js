@@ -250,6 +250,8 @@ async function interpretCommand(message) {
     or
     {"action": "attack", "target": "<mob_name_or_player_username>", "amount": <number>, "language": "<pl_or_en>"}
     or
+    {"action": "give", "item": "<minecraft_item_name>", "amount": <number>, "language": "<pl_or_en>"}
+    or
     {"action": "chat", "block": null, "amount": null, "language": "<pl_or_en>"}
 
     Use "pl" for language if the player wrote in Polish, otherwise use "en". 
@@ -261,6 +263,10 @@ async function interpretCommand(message) {
     - "target": the exact player username if attacking a player, OR the minecraft mob name in English lowercase with underscores if attacking a mob (e.g. "zombie", "skeleton", "spider", "creeper", "ghast", "enderman", "shulker", "ender_dragon", "pillager", "blaze", "breeze", "cow", "piglin", "sheep")
 
     If attacking mobs, "amount" is how many to kill (default 1 if not specified). If attacking a player, "amount" should always be 1.
+
+    If the message asks the bot to give, hand over, drop, or toss an item to the player (e.g. in any language "give me", "daj mi", "can I have"), use "give" with:
+    - "item": the Minecraft official item name in English, lowercase, using underscores - prefer an item that actually appears in the bot's inventory listed above
+    - "amount": the requested quantity (default 1 if not specified)
 
     If message is anything else, use "action": "chat".
     Please answer in MAXIMUM 1-2 short sentences.
@@ -353,6 +359,10 @@ async function unstickSideways() {
         return
     }
     unsticking = true;
+    const saveGoal = bot.pathfinder ? bot.pathfinder.goal : null;
+    if (saveGoal) {
+        bot.pathfinder.setGoal(null);
+    }
 
     try {
     const direction = unstickAttemps % 2 === 0 ? "left" : "right"
@@ -369,8 +379,13 @@ async function unstickSideways() {
 
     bot.setControlState(direction, false)
     bot.setControlState("jump", false)
+
+    await new Promise((resolve) => setTimeout(resolve, 100));
 } finally {
     unsticking = false
+    if (saveGoal) {
+        bot.pathfinder.setGoal(saveGoal)
+    }
     }
 }
 
@@ -469,7 +484,7 @@ const armorTiers = {
 }
 
 function getArmorTier(itemName) {
-    for (const material of armorTiers) {
+    for (const material in armorTiers) {
         if (itemName.startsWith(material)) {
             return armorTiers[material]
         }
@@ -484,6 +499,53 @@ function getArmorSlot(itemName) {
     if (itemName.endsWith('_boots')) return { dest: 'feet', index: 8 };
     return null;
 }
+
+async function equipWeapon() {
+        const weapon = bot.inventory.items().find((item) => {
+            return item.name.includes('sword')
+        })
+
+        if (weapon) {
+            await bot.equip(weapon, 'hand')
+        }
+    }
+
+    let inCombat = false;
+
+async function handleHostileThreat() {
+    if (inCombat) return false;
+
+    const mob = bot.nearestEntity((entity) => {
+        return hostileMobs.includes(entity.name) && bot.entity.position.distanceTo(entity.position) <= 8;
+    });
+
+    if (!mob) return false;
+
+    inCombat = true;
+    const wasBusy = botBusy;
+    console.log(`Combat: defense against ${mob.name}`);
+
+    try{
+        if (bot.pathfinder) bot.pathfinder.setGoal(null);
+        try { await bot.collectBlock.cancelTask(); } catch (err) { }
+            await equipWeapon();
+            bot.pvp.movements = defaultMove;
+            bot.pvp.followRange = 2;
+            bot.pvp.attack(mob);
+
+            await new Promise((resolve) => {
+                bot.once('stoppedAttacking', resolve);
+            });
+
+        } finally {
+            inCombat = false;
+            botBusy = wasBusy;
+        }
+
+        return true;
+    }
+
+
 
 async function equipBestArmor() {
     const bestPerSlot = {};
@@ -515,15 +577,7 @@ async function equipBestArmor() {
     }
 }
 
- async function equipWeapon() {
-        const weapon = bot.inventory.items().find((item) => {
-            return item.name.includes('sword')
-        })
 
-        if (weapon) {
-            await bot.equip(weapon, 'hand')
-        }
-    }
 
 bot.on("physicsTick", () => {
     if (!bot.entity) {
@@ -780,6 +834,11 @@ bot.on('error', (err) => {
     }
 });
 
+bot.on('entityHurt', (entity) => {
+    if (entity !== bot.entity) return;
+    handleHostileThreat();
+})
+
 bot.on('playerCollect', (collector, collected) => {
     if (collector !== bot.entity) return;
     setTimeout(equipBestArmor, 150);
@@ -808,6 +867,8 @@ let lastPosition = null;
         const startY = Math.floor(bot.entity.position.y)
 
         while (collected < amount) {
+            await handleHostileThreat();
+
             const targetBlock = findSafeBlocks(blockName, startY)
 
             console.log("Bot position:", bot.entity.position)
@@ -870,7 +931,7 @@ function findSafeBlocks(blockName, startY) {
     return null
 }
 
-    const interpretation = await interpretCommand(message)
+    const interpretation = await interpretCommand(message, getBotContextSummary())
     console.log("AI intepretation:", interpretation)
 
     if (interpretation.action === 'collect') {
@@ -904,6 +965,43 @@ function findSafeBlocks(blockName, startY) {
         }
         botBusy = false
         return
+    }
+
+    if (interpretation.action === 'give') {
+        if (botBusy) {
+            bot.chat(translations.getMessage(interpretation.language, "busy"));
+            return;
+        }
+
+        if (!target) {
+            const dontseeyou = languages.getMessage(interpretation.language, 'dontSeeYou')
+            bot.chat(`${dontseeyou}`)
+            return;
+        }
+
+        const itemStack = bot.inventory.items().find((item) => item.name === interpretation.item);
+
+        if (!itemStack) {
+            const IdontHave = languages.getMessage(interpretation.language, 'IdontHave')
+            bot.chat(`${IdontHave} ${interpretation.item}`);
+            return;
+        }
+
+        botBusy = true;
+        const amountToGive = Math.min(interpretation.amount || 1, itemStack.count);
+
+        await goToPlayer(target);
+
+        try {
+            await bot.toss(itemStack.type, null, amountToGive);
+            const HereYouGo = languages.getMessage(interpretation.language, 'HereYouGo')
+            bot.chat(`${HereYouGo} ${amountToGive}x ${interpretation.item}`)
+        } catch (err) {
+            console.log(`Failed to give item: ${err.message}`)
+            const giveError = languages.getMessage(interpretation.language, 'giveError');
+        }
+        botBusy = false;
+        return;
     }
 
     if (interpretation.action === 'attack') {
