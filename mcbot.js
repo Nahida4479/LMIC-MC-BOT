@@ -858,6 +858,14 @@ bot.on('entityHurt', (entity) => {
     handleHostileThreat();
 })
 
+bot.on('death', () => {
+    botBusy = false;
+    inCombat = false;
+    unsticking = false;
+    if (bot.pathfinder) bot.pathfinder.setGoal(null);
+    if (bot.pvp) bot.pvp.stop();
+});
+
 bot.on('playerCollect', (collector, collected) => {
     if (collector !== bot.entity) return;
     setTimeout(equipBestArmor, 150);
