@@ -1,4 +1,4 @@
-# LMIN-MC-BOT
+# LMIC-MC-BOT
 A Mineflayer-based Minecraft bot integrated with an LLM API for real-time, context-aware chat and navigation.
 
 ## Table of contents
@@ -99,7 +99,7 @@ Since I don't have a stable 24/7 hosting, you can run the Minecraft server local
 
 ## Installation
 ```
-git clone https://github.com/Nahida4479/LMIN-MC-BOT.git
+git clone https://github.com/Nahida4479/LMIC-MC-BOT.git
 cd LMIC-MC-BOT
 npm install
 ```
