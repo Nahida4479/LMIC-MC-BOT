@@ -499,6 +499,22 @@ function getArmorSlot(itemName) {
     return null;
 }
 
+async function fightEntity(targetEntity) {
+    await equipWeapon();
+    bot.pvp.movements = defaultMove;
+    bot.pvp.followRange = 2;
+    bot.pvp.attack(targetEntity);
+
+    await Promise.race([
+        new Promise((resolve) => bot.once('stoppedAttacking', resolve)),
+        timeout(20000).catch(() => {})
+    ]);
+
+    if (bot.pvp.target) {
+        bot.pvp.stop();
+    }
+}
+
 async function equipWeapon() {
         const weapon = bot.inventory.items().find((item) => {
             return item.name.includes('sword')
@@ -524,18 +540,10 @@ async function handleHostileThreat() {
     const wasBusy = botBusy;
     console.log(`Combat: defense against ${mob.name}`);
 
-    try{
-        if (bot.pathfinder) bot.pathfinder.setGoal(null);
-        try { await bot.collectBlock.cancelTask(); } catch (err) { }
-            await equipWeapon();
-            bot.pvp.movements = defaultMove;
-            bot.pvp.followRange = 2;
-            bot.pvp.attack(mob);
-
-            await new Promise((resolve) => {
-                bot.once('stoppedAttacking', resolve);
-            });
-
+        try{
+            if (bot.pathfinder) bot.pathfinder.setGoal(null);
+            try { await bot.collectBlock.cancelTask(); } catch (err) { }
+            await fightEntity(mob);
         } finally {
             inCombat = false;
             botBusy = wasBusy;
@@ -777,10 +785,8 @@ const followInternal = setInterval(async () => {
 
     if (nearbyHostile) {
         botBusy = true
-        await equipWeapon();
-        bot.pvp.movements = defaultMove;
-        bot.pvp.followRange = 2;
-        bot.pvp.attack(nearbyHostile)
+        await fightEntity(nearbyHostile);
+        botBusy = false
         return
     }
 
@@ -857,9 +863,6 @@ bot.on('playerCollect', (collector, collected) => {
     setTimeout(equipBestArmor, 150);
 })
 
-bot.on('stoppedAttacking', () => {
-    botBusy = false
-})
 
 bot.on('chat', async (username, message) => {
     if (username === bot.username) return
@@ -1057,18 +1060,11 @@ function findSafeBlocks(blockName, startY) {
                 targetEntity = bot.nearestEntity((entity) => entity.name === interpretation.target)
         }
 
-            if (!targetEntity) {
+                     if (!targetEntity) {
                 break
             }
 
-            await equipWeapon();
-            bot.pvp.movements = defaultMove
-            bot.pvp.followRange = 2
-            bot.pvp.attack(targetEntity)
-
-            await new Promise((resolve) => {
-                bot.once('stoppedAttacking', resolve)
-            })
+            await fightEntity(targetEntity);
             killed = killed + 1
         }
 
@@ -1083,7 +1079,6 @@ function findSafeBlocks(blockName, startY) {
 
     if (message.toLowerCase().includes('fight me')  ) {
         const player = bot.players[username];
-        botBusy = true;
 
         if (!player) {
             const dontSeeYou = languages.getMessage(interpretation.language, "dontSeeYou")
@@ -1091,9 +1086,9 @@ function findSafeBlocks(blockName, startY) {
             return
         }
         
-        bot.pvp.movements = defaultMove;
-        bot.pvp.followRange= 3;       
-        bot.pvp.attack(player.entity);
+        botBusy = true;
+        await fightEntity(player.entity);
+        botBusy = false;
         return;
     }
 
