@@ -301,7 +301,7 @@ const bot = mineflayer.createBot({
     host: process.env.SERVER,  // ADD SERVER= in .env
     port: parseInt(process.env.SERVER_PORT), // ADD SERVER_PORT in .env
     username: process.env.BOT_NAME, 
-    auth: 'offline' // Offline servers
+    auth: process.env.AUTH // Offline servers
 
 });
 

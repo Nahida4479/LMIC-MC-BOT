@@ -1,6 +1,10 @@
 # LMIC-MC-BOT
 A Mineflayer-based Minecraft bot integrated with an LLM API for real-time, context-aware chat and navigation.
 
+# Test
+Minecraft version 26.2 server:
+`lmic.minehut.gg`
+
 ## Table of contents
 - [Supported languages](#supported-languages)
 - [Requirements](#requirements)
@@ -109,6 +113,7 @@ Create a .env file in the project folder:
 BOT_NAME=LMIC-MC-BOT
 SERVER=localhost       # for example localhost
 SERVER_PORT=25565      # Default 25565              
+AUTH=                  # offline/microsoft
 
 GEMINI_FREE_API=
 GROQ_FREE_API=
