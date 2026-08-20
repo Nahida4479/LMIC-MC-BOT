@@ -750,11 +750,20 @@ function isBotTrapped() {
     return false
 }
 async function digOut() {
-    while (isBotTrapped()) {
+    let attempts = 0;
+    while (isBotTrapped() && attempts < 5) {
         const above = bot.blockAt(bot.entity.position.offset(0, 1, 0))
-        if (above && above.name !== "air") {
+        if (above && above.name !== "air" && bot.canDigBlock(above)) {
+            try {
             await bot.dig(above)
+            } catch (err) {
+                console.log(`digOut failed: ${err.message}`)
+                break
+            }
+        } else {
+            break
         }
+        attempts++
     }
 }
 
@@ -968,14 +977,14 @@ function findSafeBlocks(blockName, startY) {
     console.log("AI intepretation:", interpretation)
 
     if (interpretation.action === 'collect') {
-        if (botBusy) {
-            bot.chat(translations.getMessage(interpretation.language, "busy"))
-            return
-        }
+    if (botBusy) {
+        bot.chat(translations.getMessage(interpretation.language, "busy"))
+        return
+    }
 
-        botBusy = true
+    botBusy = true
+    try {
         const noProblem = languages.getMessage(interpretation.language, "noProblem")
-
         bot.chat(`${noProblem} ${interpretation.amount}x ${interpretation.block}`)
 
         const collected = await gatherBlocks(interpretation.block, interpretation.amount) 
@@ -987,16 +996,16 @@ function findSafeBlocks(blockName, startY) {
 
         if (target) {
             await goToPlayer(target)
-        }
 
-        if (collected > 0) {
-            try {
-                const collectedItemStack = bot.inventory.items().find((item) => item.name === interpretation.block);
-                if (collectedItemStack) {
-                    await bot.toss(collectedItemStack.type, null, Math.min(collected, collectedItemStack.count));
+            if (collected > 0) {
+                try {
+                    const collectedItemStack = bot.inventory.items().find((item) => item.name === interpretation.block);
+                    if (collectedItemStack) {
+                        await bot.toss(collectedItemStack.type, null, Math.min(collected, collectedItemStack.count));
+                    }
+                } catch (err) {
+                    console.log(`Failed to give collected items: ${err.message}`)
                 }
-            } catch (err) {
-                console.log(`Failed to give collected items: ${err.message}`)
             }
         }
 
@@ -1007,9 +1016,13 @@ function findSafeBlocks(blockName, startY) {
             const text = translations.getMessage(interpretation.language, "collected")
             bot.chat(`${text} ${collected}x ${interpretation.block}`)
         }
+    } catch (err) {
+        console.log(`Collect command failed: ${err.message}`)
+    } finally {
         botBusy = false
-        return
     }
+    return
+}
 
     if (interpretation.action === 'give') {
         if (botBusy) {

@@ -4,6 +4,8 @@ A Mineflayer-based Minecraft bot integrated with an LLM API for real-time, conte
 # Test
 Minecraft version 26.2 server:
 `lmic.minehut.gg`
+**Bot name:**
+`szymoni12345` please use this name for a conversation with a bot
 
 ## Table of contents
 - [Supported languages](#supported-languages)
